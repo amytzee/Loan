@@ -85,6 +85,27 @@ interface Translation {
   };
 }
 
+interface AppConfig {
+  name: string;
+  logoUrl: string;
+}
+
+interface LoanFormField {
+  label: string;
+  type: 'text' | 'number' | 'image' | 'tel';
+  required: boolean;
+}
+
+interface LoanProduct {
+  id?: string;
+  title: string;
+  description: string;
+  icon: string; // Emoji or Lucide name or URL
+  iconType: 'emoji' | 'lucide' | 'url';
+  color: string;
+  formFields: LoanFormField[];
+}
+
 // --- Translations Data ---
 const translations: Record<Language, Translation> = {
   sw: {
@@ -234,7 +255,7 @@ const translations: Record<Language, Translation> = {
 };
 
 // --- Navbar Component ---
-const Navbar = ({ lang, setLang, activeView, setActiveView, user }: { lang: Language, setLang: (l: Language) => void, activeView: string, setActiveView: (v: string) => void, user: any }) => {
+const Navbar = ({ lang, setLang, activeView, setActiveView, user, appConfig }: { lang: Language, setLang: (l: Language) => void, activeView: string, setActiveView: (v: string) => void, user: any, appConfig: AppConfig }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const t = translations[lang].nav;
@@ -251,11 +272,15 @@ const Navbar = ({ lang, setLang, activeView, setActiveView, user }: { lang: Lang
         <div className="max-w-7xl mx-auto px-4 md:px-6">
           <div className={`glass rounded-3xl px-6 py-3 flex justify-between items-center transition-all duration-500 ${scrolled ? 'shadow-2xl shadow-brand-blue/5 border-gray-100' : 'bg-transparent border-transparent'}`}>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-brand-blue rounded-xl flex items-center justify-center shadow-lg shadow-brand-blue/20">
-                <ShieldCheck className="text-white w-6 h-6" />
+              <div className="w-10 h-10 bg-brand-blue rounded-xl flex items-center justify-center shadow-lg shadow-brand-blue/20 overflow-hidden">
+                {appConfig.logoUrl ? (
+                  <img src={appConfig.logoUrl} className="w-full h-full object-cover" />
+                ) : (
+                  <ShieldCheck className="text-white w-6 h-6" />
+                )}
               </div>
               <span className={`text-xl font-display font-bold tracking-tight ${scrolled ? 'text-brand-blue' : 'text-white'}`}>
-                Coshve<span className="text-brand-gold">.</span>
+                {appConfig.name}<span className="text-brand-gold">.</span>
               </span>
             </div>
 
@@ -335,7 +360,7 @@ const Navbar = ({ lang, setLang, activeView, setActiveView, user }: { lang: Lang
 };
 
 // --- Hero Component ---
-const Hero = ({ lang, users }: { lang: Language, users: any[] }) => {
+const Hero = ({ lang, users, appConfig }: { lang: Language, users: any[], appConfig: AppConfig }) => {
   const t = translations[lang].hero;
   return (
     <section id="home" className="relative min-h-[90vh] md:min-h-[95vh] flex items-center pt-24 pb-12 md:pb-24 overflow-hidden bg-brand-dark">
@@ -357,7 +382,7 @@ const Hero = ({ lang, users }: { lang: Language, users: any[] }) => {
           </div>
           
           <h1 className="text-4xl sm:text-6xl md:text-8xl font-display font-bold text-white leading-[1.1] md:leading-[0.95] mb-6 md:mb-8">
-            {t.title} <br /> 
+            {appConfig.name} <br /> 
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-gold via-yellow-200 to-brand-gold">{t.smile}</span>
           </h1>
           
@@ -366,7 +391,7 @@ const Hero = ({ lang, users }: { lang: Language, users: any[] }) => {
           </p>
 
           <div className="flex flex-col sm:flex-row flex-wrap gap-4 md:gap-5">
-            <a href="#apply" className="group bg-brand-gold text-brand-blue px-8 md:px-10 py-4 md:py-5 rounded-2xl font-black text-base md:text-lg flex items-center justify-center gap-3 hover:bg-white transition-all shadow-2xl shadow-brand-gold/20">
+            <a href="#services" className="group bg-brand-gold text-brand-blue px-8 md:px-10 py-4 md:py-5 rounded-2xl font-black text-base md:text-lg flex items-center justify-center gap-3 hover:bg-white transition-all shadow-2xl shadow-brand-gold/20">
               {t.cta} <ArrowRight size={22} className="group-hover:translate-x-1 transition-transform" />
             </a>
             {users.length > 0 && (
@@ -421,7 +446,7 @@ const Hero = ({ lang, users }: { lang: Language, users: any[] }) => {
 };
 
 // --- Services Component ---
-const Services = ({ lang }: { lang: Language }) => {
+const Services = ({ lang, loanProducts, onSelect }: { lang: Language, loanProducts: LoanProduct[], onSelect: (p: LoanProduct) => void }) => {
   const t = translations[lang].services;
   return (
     <section id="services" className="py-20 md:py-32 bg-slate-50">
@@ -438,104 +463,37 @@ const Services = ({ lang }: { lang: Language }) => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-          <motion.div 
-            whileHover={{ y: -5 }}
-            className="md:col-span-12 lg:col-span-8 bento-card flex flex-col md:flex-row gap-8 lg:gap-10 items-center overflow-hidden group"
-          >
-            <div className="flex-1 space-y-4 md:space-y-6">
-              <div className="w-12 h-12 md:w-16 md:h-16 bg-brand-blue rounded-2xl flex items-center justify-center text-white shadow-xl shadow-brand-blue/20">
-                <Briefcase size={28} />
-              </div>
-              <h3 className="text-2xl md:text-3xl font-bold text-brand-blue">{t.business.title}</h3>
-              <p className="text-slate-500 text-base md:text-lg leading-relaxed">
-                {t.business.desc}
-              </p>
-              <ul className="space-y-2 md:space-y-3">
-                {t.business.features.map(item => (
-                  <li key={item} className="flex items-center gap-2 text-slate-700 font-semibold text-sm">
-                    <CheckCircle2 size={16} className="text-brand-gold" /> {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="flex-1 w-full h-full min-h-[250px] md:min-h-[300px] rounded-3xl overflow-hidden shadow-inner">
-               <img src="https://images.unsplash.com/photo-1621348161746-b2955ecaedc4?auto=format&fit=crop&q=80&w=800" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" referrerPolicy="no-referrer" />
-            </div>
-          </motion.div>
-
-          <motion.div 
-            whileHover={{ y: -5 }}
-            className="md:col-span-6 lg:col-span-4 bento-card bg-brand-blue text-white group"
-          >
-            <div className="space-y-6 md:space-y-8 h-full flex flex-col">
-              <div className="w-12 h-12 md:w-16 md:h-16 bg-white/10 rounded-2xl flex items-center justify-center text-brand-gold border border-white/5">
-                <Home size={28} />
-              </div>
-              <h3 className="text-2xl md:text-3xl font-bold">{t.rental.title}</h3>
-              <p className="text-slate-300 leading-relaxed text-base md:text-lg">
-                {t.rental.desc}
-              </p>
-              <div className="mt-auto">
-                <a href="#apply" className="flex items-center gap-3 font-bold text-brand-gold hover:translate-x-2 transition-transform underline decoration-brand-gold/30">
-                  {lang === 'sw' ? 'Omba Sasa' : 'Apply Now'} <ArrowRight size={18} />
-                </a>
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div 
-            whileHover={{ y: -5 }}
-            className="md:col-span-6 lg:col-span-4 bento-card group"
-          >
-            <div className="space-y-4 md:space-y-6 h-full flex flex-col">
-              <div className="w-12 h-12 md:w-16 md:h-16 bg-brand-blue/5 rounded-2xl flex items-center justify-center text-brand-blue group-hover:bg-brand-blue group-hover:text-white transition-colors">
-                <GraduationCap size={28} />
-              </div>
-              <h3 className="text-xl md:text-2xl font-bold text-brand-blue">{t.education.title}</h3>
-              <p className="text-slate-500 text-sm md:text-base">{t.education.desc}</p>
-              <div className="mt-auto pt-4 md:pt-6">
-                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">{t.education.accent}</span>
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div 
-            whileHover={{ y: -5 }}
-            className="md:col-span-12 lg:col-span-8 bento-card bg-brand-gold/10 border-brand-gold/20 flex flex-col md:flex-row gap-8 md:gap-10 items-center"
-          >
-             <div className="flex-1 space-y-4 md:space-y-6">
-                <div className="w-12 h-12 md:w-16 md:h-16 bg-brand-gold rounded-2xl flex items-center justify-center text-brand-blue shadow-lg shadow-brand-gold/20">
-                  <UserCheck size={28} />
-                </div>
-                <h3 className="text-2xl md:text-3xl font-bold text-brand-blue">{t.personal.title}</h3>
-                <p className="text-slate-600 text-base md:text-lg">
-                  {t.personal.desc}
-                </p>
-                <div className="flex gap-3 md:gap-4">
-                  <div className="bg-white px-3 md:px-4 py-2 rounded-xl shadow-sm border border-brand-gold/20">
-                    <p className="text-[9px] md:text-[10px] text-slate-400 font-bold uppercase">{lang === 'sw' ? 'Kuhusu' : 'About'}</p>
-                    <p className="text-brand-blue font-bold text-xs md:text-sm">{t.personal.badge1}</p>
-                  </div>
-                   <div className="bg-white px-3 md:px-4 py-2 rounded-xl shadow-sm border border-brand-gold/20">
-                    <p className="text-[9px] md:text-[10px] text-slate-400 font-bold uppercase">{lang === 'sw' ? 'Ofa' : 'Offer'}</p>
-                    <p className="text-brand-blue font-bold text-xs md:text-sm">{t.personal.badge2}</p>
-                  </div>
-                </div>
-             </div>
-             <div className="flex-1 w-full flex justify-center">
-                <div className="relative w-40 h-40 md:w-48 md:h-48">
-                   <motion.div 
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                    className="absolute inset-0 border-4 border-dashed border-brand-gold/30 rounded-full" 
-                   />
-                   <div className="absolute inset-3 md:inset-4 bg-brand-blue rounded-full flex items-center justify-center text-white font-display font-bold text-base md:text-lg text-center p-4">
-                      {lang === 'sw' ? 'Tunasitiri Tabasamu' : 'Smile for you'}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+          {loanProducts.map((p, idx) => {
+            const IconMap: Record<string, any> = { User, Home, Briefcase, GraduationCap, Wallet, HandCoins, Building2, Clock };
+            const IconComponent = IconMap[p.icon] || Briefcase;
+            
+            return (
+              <motion.div 
+                key={p.id || idx}
+                whileHover={{ y: -10 }}
+                className="bento-card group flex flex-col h-full bg-white border border-gray-100 hover:border-brand-gold transition-all duration-500 shadow-sm hover:shadow-2xl hover:shadow-brand-gold/5"
+              >
+                <div className="flex items-center justify-between mb-8">
+                   <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl ${p.color} ring-4 ring-white shadow-lg`}>
+                      {p.iconType === 'emoji' ? p.icon : (p.iconType === 'url' ? <img src={p.icon} className="w-8 h-8 object-contain" /> : <IconComponent size={24} />)}
                    </div>
                 </div>
-             </div>
-          </motion.div>
+                
+                <h3 className="text-2xl font-bold text-brand-blue mb-3 group-hover:text-brand-gold transition-colors">{p.title} Loan</h3>
+                <p className="text-slate-500 text-sm md:text-base leading-relaxed mb-8 flex-1">
+                  {p.description || translations[lang].hero.desc}
+                </p>
+
+                <button 
+                  onClick={() => onSelect(p)}
+                  className="flex items-center gap-3 font-bold text-sm text-brand-blue group-hover:text-brand-gold group-hover:translate-x-2 transition-all"
+                >
+                  {lang === 'sw' ? 'Omba Sasa' : 'Apply Now'} <ArrowRight size={18} />
+                </button>
+              </motion.div>
+            );
+          })}
         </div>
       </div>
     </section>
@@ -853,7 +811,20 @@ export default function App() {
   const [loanProducts, setLoanProducts] = useState<any[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [publicUsers, setPublicUsers] = useState<any[]>([]);
-  const [adminTab, setAdminTab] = useState<'loans' | 'users' | 'products'>('loans');
+  const [appConfig, setAppConfig] = useState<AppConfig>({ name: 'Coshve', logoUrl: '' });
+  const [adminTab, setAdminTab] = useState<'loans' | 'users' | 'products' | 'settings'>('loans');
+  const [selectedProduct, setSelectedProduct] = useState<LoanProduct | null>(null);
+
+  useEffect(() => {
+    const fetchConfig = async () => {
+      const { doc, onSnapshot } = await import('firebase/firestore');
+      const { db } = await import('./lib/firebase');
+      return onSnapshot(doc(db, 'appConfig', 'main'), (snap) => {
+        if (snap.exists()) setAppConfig(snap.data() as AppConfig);
+      });
+    };
+    fetchConfig();
+  }, []);
 
   useEffect(() => {
     let unsubUsers: (() => void) | undefined;
@@ -945,7 +916,13 @@ export default function App() {
           const docSnap = await getDoc(docRef);
           
           if (docSnap.exists()) {
-            setProfileData(docSnap.data());
+            const data = docSnap.data();
+            if (data.isBlocked) {
+              await auth.signOut();
+              alert('Your account is blocked. Please contact support.');
+              return;
+            }
+            setProfileData(data);
           } else {
             // Create user profile on first login
             const newProfile = {
@@ -979,7 +956,14 @@ export default function App() {
 
   return (
     <div className="font-sans antialiased text-brand-dark bg-brand-light min-h-screen scroll-smooth overflow-x-hidden selection:bg-brand-gold/30 selection:text-brand-blue">
-      <Navbar lang={lang} setLang={setLang} activeView={activeView} setActiveView={setActiveView} user={user} />
+      <Navbar 
+        lang={lang} 
+        setLang={setLang} 
+        activeView={activeView} 
+        setActiveView={setActiveView} 
+        user={user} 
+        appConfig={appConfig}
+      />
       <main className={activeView !== 'home' ? 'pt-24 pb-32' : ''}>
         <AnimatePresence mode="wait">
           {activeView === 'home' && (
@@ -989,8 +973,16 @@ export default function App() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
-              <Hero lang={lang} users={publicUsers} />
-              <Services lang={lang} />
+              <Hero lang={lang} users={publicUsers} appConfig={appConfig} />
+              <Services 
+                lang={lang} 
+                loanProducts={loanProducts} 
+                onSelect={(p) => {
+                  setSelectedProduct(p);
+                  setActiveView('apply');
+                  window.scrollTo(0, 0);
+                }} 
+              />
               <Process lang={lang} />
               <LoanCalculator lang={lang} />
               <ContactForm lang={lang} user={user} />
@@ -1010,14 +1002,21 @@ export default function App() {
                 <p className="text-gray-500">Pick the best plan for your needs</p>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-                {loanProducts.map((item, i) => {
+                {loanProducts.map((item: LoanProduct, i) => {
                   const IconMap: Record<string, any> = { User, Home, Briefcase, GraduationCap, Wallet, HandCoins, Building2, Clock };
                   const IconComponent = IconMap[item.icon] || Briefcase;
 
                   return (
-                    <button key={i} className="app-card text-center flex flex-col items-center gap-4 hover:border-brand-blue group" onClick={() => setActiveView('home')}>
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${item.color} group-hover:scale-110 transition-transform`}>
-                        <IconComponent size={28} />
+                    <button 
+                      key={i} 
+                      className="app-card text-center flex flex-col items-center gap-4 hover:border-brand-blue group" 
+                      onClick={() => {
+                        setSelectedProduct(item);
+                        setActiveView('apply');
+                      }}
+                    >
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${item.color} group-hover:scale-110 transition-transform text-2xl`}>
+                        {item.iconType === 'emoji' ? item.icon : (item.iconType === 'url' ? <img src={item.icon} className="w-8 h-8 object-contain" /> : <IconComponent size={28} />)}
                       </div>
                       <span className="font-bold text-sm text-brand-blue">{item.title} Loan</span>
                     </button>
@@ -1029,6 +1028,84 @@ export default function App() {
                     <span className="text-xs font-bold uppercase tracking-widest">Manage Items</span>
                   </button>
                 )}
+              </div>
+            </motion.div>
+          )}
+
+          {activeView === 'apply' && (
+            <motion.div
+              key="apply"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="max-w-xl mx-auto px-4"
+            >
+              <button onClick={() => setActiveView('services')} className="mb-8 flex items-center gap-2 text-gray-400 font-bold text-xs uppercase tracking-widest hover:text-brand-blue transition-colors">
+                <ChevronRight size={16} className="rotate-180" /> Back to Loans
+              </button>
+
+              <div className="app-card space-y-8">
+                <div className="flex items-center gap-6">
+                  <div className={`w-16 h-16 rounded-3xl flex items-center justify-center text-3xl ${selectedProduct?.color}`}>
+                    {selectedProduct?.iconType === 'emoji' ? selectedProduct.icon : (selectedProduct?.iconType === 'url' ? <img src={selectedProduct.icon} className="w-10 h-10" /> : <Briefcase size={32} />)}
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-display font-bold text-brand-blue">{selectedProduct?.title} Loan</h1>
+                    <p className="text-gray-400 text-sm mt-1">{selectedProduct?.description}</p>
+                  </div>
+                </div>
+
+                <form className="space-y-6" onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!user) {
+                    alert('Please sign in first');
+                    setActiveView('profile');
+                    return;
+                  }
+                  
+                  const formData = new FormData(e.currentTarget);
+                  const data: any = {};
+                  selectedProduct?.formFields.forEach(f => {
+                    data[f.label] = formData.get(f.label);
+                  });
+
+                  try {
+                    const { collection, addDoc } = await import('firebase/firestore');
+                    const { db } = await import('./lib/firebase');
+                    await addDoc(collection(db, 'applications'), {
+                      userId: user.uid,
+                      fullName: user.displayName || profileData?.fullName,
+                      phone: profileData?.phone || '',
+                      loanType: selectedProduct?.title,
+                      timestamp: new Date().toISOString(),
+                      status: 'Pending',
+                      amount: data['Amount'] || 0,
+                      customData: data
+                    });
+                    alert('Application submitted successfully!');
+                    setActiveView('history');
+                  } catch (err) {
+                    console.error(err);
+                    alert('Error submitting application');
+                  }
+                }}>
+                  <div className="grid grid-cols-1 gap-6">
+                    {selectedProduct?.formFields.map((field, i) => (
+                      <div key={i}>
+                        <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">{field.label}</label>
+                        <input 
+                          name={field.label}
+                          type={field.type} 
+                          required={field.required}
+                          placeholder={`Enter your ${field.label.toLowerCase()}`}
+                          className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 font-bold text-sm focus:ring-2 focus:ring-brand-blue/10 outline-none"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <button type="submit" className="w-full btn-primary py-5 rounded-2xl text-base shadow-xl shadow-brand-blue/20">
+                    Submit Application
+                  </button>
+                </form>
               </div>
             </motion.div>
           )}
@@ -1047,12 +1124,12 @@ export default function App() {
                   <p className="text-sm text-gray-500">{user?.email === 'admin@gmail.com' ? 'Monitor all system activities' : 'Real-time update of your requests'}</p>
                 </div>
                 {user?.email === 'admin@gmail.com' && (
-                  <div className="flex bg-gray-100 p-1 rounded-2xl">
-                    {(['loans', 'users', 'products'] as const).map((tab) => (
+                  <div className="flex bg-gray-100 p-1 rounded-2xl overflow-x-auto no-scrollbar">
+                    {(['loans', 'users', 'products', 'settings'] as const).map((tab) => (
                       <button 
                         key={tab}
                         onClick={() => setAdminTab(tab)}
-                        className={`px-4 py-2 rounded-xl text-xs font-bold capitalize transition-all ${adminTab === tab ? 'bg-white text-brand-blue shadow-sm' : 'text-gray-400'}`}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold capitalize transition-all whitespace-nowrap ${adminTab === tab ? 'bg-white text-brand-blue shadow-sm' : 'text-gray-400'}`}
                       >
                         {tab}
                       </button>
@@ -1061,9 +1138,41 @@ export default function App() {
                 )}
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {user?.email === 'admin@gmail.com' ? (
                   <>
+                    {adminTab === 'settings' && (
+                      <div className="app-card space-y-6">
+                        <h3 className="font-bold text-brand-blue">App Configuration</h3>
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">App Name</label>
+                            <input 
+                              className="w-full bg-gray-50 border-none rounded-xl p-4 font-bold text-sm" 
+                              value={appConfig.name}
+                              onChange={async (e) => {
+                                const { doc, setDoc } = await import('firebase/firestore');
+                                const { db } = await import('./lib/firebase');
+                                await setDoc(doc(db, 'appConfig', 'main'), { ...appConfig, name: e.target.value }, { merge: true });
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Logo URL</label>
+                            <input 
+                              className="w-full bg-gray-50 border-none rounded-xl p-4 font-bold text-sm" 
+                              value={appConfig.logoUrl}
+                              placeholder="https://example.com/logo.png"
+                              onChange={async (e) => {
+                                const { doc, setDoc } = await import('firebase/firestore');
+                                const { db } = await import('./lib/firebase');
+                                await setDoc(doc(db, 'appConfig', 'main'), { ...appConfig, logoUrl: e.target.value }, { merge: true });
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     {adminTab === 'loans' && (
                       <div className="space-y-4">
                         {applications.map((loan) => (
@@ -1080,6 +1189,11 @@ export default function App() {
                                   {loan.fullName} <span className="text-[10px] bg-gray-100 px-2 rounded text-gray-500">{loan.loanType}</span>
                                 </h4>
                                 <p className="text-xs text-gray-400">{loan.phone} • {new Date(loan.timestamp).toLocaleString()}</p>
+                                <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1">
+                                  {Object.entries(loan.customData || {}).map(([k, v]: [any, any]) => (
+                                    <p key={k} className="text-[10px] text-gray-500"><span className="font-bold capitalize">{k}:</span> {v}</p>
+                                  ))}
+                                </div>
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
@@ -1121,51 +1235,102 @@ export default function App() {
                     {adminTab === 'users' && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {allUsers.map((u) => (
-                          <div key={u.id} className="app-card flex items-center gap-4">
-                            <img src={u.photoURL || 'https://i.pravatar.cc/150?u='+u.id} className="w-12 h-12 rounded-full object-cover" referrerPolicy="no-referrer" />
-                            <div>
-                              <h4 className="font-bold text-brand-blue text-sm">{u.fullName}</h4>
-                              <p className="text-xs text-gray-400">{u.phone}</p>
-                              <p className="text-[10px] text-gray-300 font-mono mt-1">{u.email}</p>
+                          <div key={u.id} className="app-card flex flex-col gap-4">
+                            <div className="flex items-center gap-4">
+                              <img src={u.photoURL || 'https://i.pravatar.cc/150?u='+u.id} className="w-12 h-12 rounded-full object-cover" referrerPolicy="no-referrer" />
+                              <div className="flex-1">
+                                <h4 className="font-bold text-brand-blue text-sm flex items-center gap-2">
+                                  {u.fullName} {u.isBlocked && <span className="text-[8px] bg-rose-500 text-white px-1.5 rounded">BLOCKED</span>}
+                                </h4>
+                                <p className="text-xs text-gray-400">{u.phone}</p>
+                                <p className="text-[10px] text-gray-300 font-mono mt-1">{u.email}</p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button 
+                                onClick={async () => {
+                                  const { doc, updateDoc } = await import('firebase/firestore');
+                                  const { db } = await import('./lib/firebase');
+                                  await updateDoc(doc(db, 'users', u.id), { isBlocked: !u.isBlocked });
+                                }}
+                                className={`flex-1 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest ${u.isBlocked ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}
+                              >
+                                {u.isBlocked ? 'Unblock' : 'Block'}
+                              </button>
+                              <button 
+                                onClick={async () => {
+                                  const { doc, deleteDoc } = await import('firebase/firestore');
+                                  const { db } = await import('./lib/firebase');
+                                  if(confirm('Delete this user?')) await deleteDoc(doc(db, 'users', u.id));
+                                }}
+                                className="px-4 bg-gray-50 text-gray-400 rounded-xl"
+                              >
+                                <X size={14} />
+                              </button>
                             </div>
                           </div>
                         ))}
                       </div>
                     )}
                     {adminTab === 'products' && (
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                         {loanProducts.map((p) => (
-                           <div key={p.id || p.title} className="app-card border-2 border-gray-50 flex flex-col items-center gap-2">
-                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${p.color}`}>
-                                {p.title[0]}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                         {loanProducts.map((p: LoanProduct) => (
+                           <div key={p.id} className="app-card border-none shadow-sm ring-1 ring-gray-100 group">
+                             <div className="flex items-center justify-between mb-4">
+                               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl ${p.color}`}>
+                                  {p.iconType === 'emoji' ? p.icon : (p.iconType === 'url' ? <img src={p.icon} className="w-6 h-6 object-contain" /> : <Briefcase size={20} />)}
+                               </div>
+                               <div className="flex gap-2">
+                                 <button 
+                                  onClick={async () => {
+                                    const { doc, deleteDoc } = await import('firebase/firestore');
+                                    const { db } = await import('./lib/firebase');
+                                    if(confirm('Delete product?')) await deleteDoc(doc(db, 'loanProducts', p.id!));
+                                  }}
+                                  className="p-2 text-gray-300 hover:text-rose-500 transition-colors"
+                                 ><X size={18} /></button>
+                               </div>
                              </div>
-                             <span className="font-bold text-xs">{p.title}</span>
-                             {p.id && (
-                               <button 
-                                onClick={async () => {
-                                  const { doc, deleteDoc } = await import('firebase/firestore');
-                                  const { db } = await import('./lib/firebase');
-                                  await deleteDoc(doc(db, 'loanProducts', p.id));
-                                }}
-                                className="text-[10px] text-rose-500 font-bold mt-2"
-                               >Delete</button>
-                             )}
+                             <h4 className="font-bold text-brand-blue mb-1">{p.title}</h4>
+                             <p className="text-xs text-gray-500 mb-4 line-clamp-2">{p.description}</p>
+                             <div className="bg-gray-50 rounded-xl p-3">
+                               <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Form Fields ({p.formFields?.length || 0})</p>
+                               <div className="flex flex-wrap gap-2">
+                                 {p.formFields?.map((f, i) => (
+                                   <span key={i} className="text-[9px] bg-white border border-gray-200 px-2 py-1 rounded-lg text-gray-600 font-bold">{f.label}</span>
+                                 ))}
+                               </div>
+                             </div>
                            </div>
                          ))}
+                         
                          <button 
                           onClick={async () => {
                             const title = prompt('Loan Title?');
                             if (!title) return;
+                            const desc = prompt('Description?');
                             const { collection, addDoc } = await import('firebase/firestore');
                             const { db } = await import('./lib/firebase');
                             await addDoc(collection(db, 'loanProducts'), {
                               title,
-                              icon: 'Briefcase',
-                              color: 'bg-gray-100 text-gray-600'
+                              description: desc || '',
+                              icon: '💰',
+                              iconType: 'emoji',
+                              color: 'bg-indigo-50 text-indigo-600',
+                              formFields: [
+                                { label: 'Full Name', type: 'text', required: true },
+                                { label: 'Phone', type: 'tel', required: true },
+                                { label: 'Amount', type: 'number', required: true }
+                              ]
                             });
                           }}
-                          className="app-card border-dashed border-2 flex items-center justify-center text-gray-400 text-xs font-bold"
-                         >+ Add New</button>
+                          className="app-card border-dashed border-2 border-gray-200 flex flex-col items-center justify-center gap-4 text-gray-400 py-12 hover:border-brand-blue hover:text-brand-blue transition-all"
+                         >
+                           <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center group-hover:bg-brand-blue/5">
+                             <X size={24} className="rotate-45" />
+                           </div>
+                           <span className="font-black text-[10px] uppercase tracking-[0.2em]">Add New Loan Product</span>
+                         </button>
                       </div>
                     )}
                   </>

@@ -13,14 +13,19 @@ service cloud.firestore {
       return isSignedIn() && request.auth.token.email == 'admin@gmail.com';
     }
 
+    match /appConfig/{configId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     match /users/{userId} {
       allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow create: if true; // Signup needs to create a user doc
-      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if true;
+      allow update, delete: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
     }
     
     match /applications/{applicationId} {
-      allow create: if true; // Lead generation allows guests
+      allow create: if true;
       allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
       allow update, delete: if isAdmin();
     }
