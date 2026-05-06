@@ -1,23 +1,37 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap');
 @import "tailwindcss";
 
-@theme {
-  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui;
-  --font-display: "Space Grotesk", sans-serif;
-  
-  --color-brand-blue: #003366;
-  --color-brand-gold: #D4AF37;
-  --color-brand-dark: #020617;
-  --color-brand-light: #f8fafc;
-}
-
 @layer base {
+  :root {
+    --app-font: "Plus Jakarta Sans";
+    --primary-color: #003366;
+    --secondary-color: #D4AF37;
+    --dark-bg: #020617;
+    --light-bg: #f8fafc;
+  }
+
+  .dark {
+    --light-bg: #020617;
+    --dark-bg: #f8fafc;
+    --color-brand-blue: #ffffff; /* Contrast on dark */
+  }
+
   html {
     scroll-behavior: smooth;
   }
   body {
-    @apply bg-brand-light text-brand-dark antialiased;
+    @apply bg-brand-light text-brand-dark antialiased transition-colors duration-300;
   }
+}
+
+@theme {
+  --font-sans: var(--app-font), ui-sans-serif, system-ui;
+  --font-display: var(--app-font), sans-serif;
+  
+  --color-brand-blue: var(--primary-color);
+  --color-brand-gold: var(--secondary-color);
+  --color-brand-dark: var(--dark-bg);
+  --color-brand-light: var(--light-bg);
 }
 
 .glass {

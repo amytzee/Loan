@@ -33,9 +33,14 @@ import {
   XCircle,
   Settings,
   Mail,
-  Smartphone
+  Smartphone,
+  Moon,
+  Sun,
+  Sparkles,
+  MessageSquare
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { GoogleGenAI } from '@google/genai';
 
 import { AuthView } from './components/AuthView';
 
@@ -98,6 +103,10 @@ interface Translation {
 interface AppConfig {
   name: string;
   logoUrl: string;
+  primaryColor: string;
+  secondaryColor: string;
+  fontFamily: string;
+  themeMode: 'light' | 'dark' | 'system';
 }
 
 interface LoanFormField {
@@ -275,7 +284,7 @@ const translations: Record<Language, Translation> = {
 };
 
 // --- Navbar Component ---
-const Navbar = ({ lang, setLang, activeView, setActiveView, user, appConfig }: { lang: Language, setLang: (l: Language) => void, activeView: string, setActiveView: (v: string) => void, user: any, appConfig: AppConfig }) => {
+const Navbar = ({ lang, setLang, activeView, setActiveView, user, appConfig, setAppConfig }: { lang: Language, setLang: (l: Language) => void, activeView: string, setActiveView: (v: string) => void, user: any, appConfig: AppConfig, setAppConfig: (c: AppConfig) => void }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const t = translations[lang].nav;
@@ -315,6 +324,13 @@ const Navbar = ({ lang, setLang, activeView, setActiveView, user, appConfig }: {
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border font-bold text-xs transition-all ${scrolled ? 'border-brand-blue/10 text-brand-blue hover:bg-brand-blue/5' : 'border-white/20 text-white hover:bg-white/10'}`}
               >
                 <Globe size={14} /> {lang.toUpperCase()}
+              </button>
+
+              <button 
+                onClick={() => setAppConfig({ ...appConfig, themeMode: appConfig.themeMode === 'dark' ? 'light' : 'dark' })}
+                className={`p-2 rounded-xl border transition-all ${scrolled ? 'border-brand-blue/10 text-brand-blue hover:bg-brand-blue/5' : 'border-white/20 text-white hover:bg-white/10'}`}
+              >
+                {appConfig.themeMode === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
               </button>
 
               <a href="#apply" className="btn-primary py-3 px-6 shadow-brand-blue/30">
@@ -832,13 +848,91 @@ export default function App() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [publicUsers, setPublicUsers] = useState<any[]>([]);
-  const [appConfig, setAppConfig] = useState<AppConfig>({ name: 'Coshve', logoUrl: '' });
+  const [appConfig, setAppConfig] = useState<AppConfig>({ 
+    name: 'Coshve', 
+    logoUrl: '',
+    primaryColor: '#0A3665', // Default brand-blue
+    secondaryColor: '#D4AF37', // Default brand-gold
+    fontFamily: 'Inter',
+    themeMode: 'system'
+  });
+  const [showAiAssistant, setShowAiAssistant] = useState(false);
+  const [aiHistory, setAiHistory] = useState<{role: 'user' | 'model', parts: {text: string}[]}[]>([]);
+  const [isAiLoading, setIsAiLoading] = useState(false);
   const [adminTab, setAdminTab] = useState<'loans' | 'users' | 'products' | 'settings' | 'notifs'>('loans');
   const [searchTerm, setSearchTerm] = useState('');
   const [showNotifCenter, setShowNotifCenter] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<LoanProduct | null>(null);
   const [editingProduct, setEditingProduct] = useState<LoanProduct | null>(null);
   const [broadcastMessage, setBroadcastMessage] = useState({ title: '', message: '', userId: 'all' });
+
+  useEffect(() => {
+    // Apply Branding
+    const root = document.documentElement;
+    root.style.setProperty('--primary-color', appConfig.primaryColor);
+    root.style.setProperty('--secondary-color', appConfig.secondaryColor);
+    root.style.setProperty('--app-font', appConfig.fontFamily);
+    
+    // Theme Mode
+    const isDark = appConfig.themeMode === 'dark' || (appConfig.themeMode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    if (isDark) {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+
+    // Persist to Firebase if Admin
+    if (user?.email === 'admin@gmail.com') {
+      const saveConfig = async () => {
+        const { doc, setDoc } = await import('firebase/firestore');
+        const { db } = await import('./lib/firebase');
+        await setDoc(doc(db, 'appConfig', 'main'), appConfig, { merge: true });
+      };
+      // We don't want to save on EVERY keystroke necessarily, but for now it's okay for simpler implementation
+      // or we can add a save button in admin settings (preferred)
+    }
+  }, [appConfig, user]);
+
+  useEffect(() => {
+    const fetchConfig = async () => {
+      const { doc, getDoc } = await import('firebase/firestore');
+      const { db } = await import('./lib/firebase');
+      const docSnap = await getDoc(doc(db, 'appConfig', 'main'));
+      if (docSnap.exists()) {
+        setAppConfig(docSnap.data() as AppConfig);
+      }
+    };
+    fetchConfig();
+  }, []);
+
+  const askAi = async (message: string) => {
+    if (!message.trim()) return;
+    setIsAiLoading(true);
+    const newHistory: any = [...aiHistory, { role: 'user', parts: [{ text: message }] }];
+    setAiHistory(newHistory);
+
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: newHistory,
+        config: {
+          systemInstruction: `You are the AI Assistant for ${appConfig.name}, a microfinance institution licensed by BoT. 
+          The customer's current language preference is ${lang === 'sw' ? 'Swahili' : 'English'}.
+          Answer questions about loans (Business, Rental, School Fees, Personal), application processes, and other microfinance services.
+          Be helpful, professional, and friendly. If you don't know something about a specific application, tell them to check their dashboard or contact support.`
+        }
+      });
+
+      const text = response.text || "Pardon, I couldn't process that.";
+      setAiHistory([...newHistory, { role: 'model', parts: [{ text }] }]);
+    } catch (err) {
+      console.error(err);
+      setAiHistory([...newHistory, { role: 'model', parts: [{ text: "Error: AI service is currently unavailable." }] }]);
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
 
   const stats = {
     total: applications.length,
@@ -1024,6 +1118,7 @@ export default function App() {
         setActiveView={setActiveView} 
         user={user} 
         appConfig={appConfig}
+        setAppConfig={setAppConfig}
       />
 
       {/* Notification Center Popover */}
@@ -1448,37 +1543,91 @@ export default function App() {
                           </div>
                         )}
                         {adminTab === 'settings' && (
-                      <div className="app-card space-y-6">
-                        <h3 className="font-bold text-brand-blue">App Configuration</h3>
-                        <div className="space-y-4">
-                          <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">App Name</label>
-                            <input 
-                              className="w-full bg-gray-50 border-none rounded-xl p-4 font-bold text-sm" 
-                              value={appConfig.name}
-                              onChange={async (e) => {
-                                const { doc, setDoc } = await import('firebase/firestore');
-                                const { db } = await import('./lib/firebase');
-                                await setDoc(doc(db, 'appConfig', 'main'), { ...appConfig, name: e.target.value }, { merge: true });
-                              }}
-                            />
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 slide-up">
+                            <div className="app-card dark:bg-slate-900 border-gray-100 dark:border-slate-800 space-y-6">
+                              <h3 className="font-bold text-brand-blue dark:text-white flex items-center gap-2"><Settings size={18} /> Basic Config</h3>
+                              <div className="space-y-4">
+                                <div>
+                                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">App Name</label>
+                                  <input 
+                                    className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-4 font-bold text-sm dark:text-white"
+                                    value={appConfig.name}
+                                    onChange={(e) => setAppConfig({ ...appConfig, name: e.target.value })}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Logo URL</label>
+                                  <input 
+                                    className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-4 font-bold text-sm dark:text-white"
+                                    value={appConfig.logoUrl}
+                                    onChange={(e) => setAppConfig({ ...appConfig, logoUrl: e.target.value })}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Default Theme Mode</label>
+                                  <div className="flex gap-2">
+                                    {(['light', 'dark', 'system'] as const).map(m => (
+                                      <button 
+                                        key={m}
+                                        onClick={() => setAppConfig({ ...appConfig, themeMode: m })}
+                                        className={`flex-1 py-3 rounded-xl font-bold text-xs capitalize transition-all ${appConfig.themeMode === m ? 'bg-brand-blue text-white shadow-lg' : 'bg-gray-100 dark:bg-slate-800 text-gray-400'}`}
+                                      >
+                                        {m}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="app-card dark:bg-slate-900 border-gray-100 dark:border-slate-800 space-y-6 text-brand-blue dark:text-white">
+                              <h3 className="font-bold flex items-center gap-2"><PenTool size={18} /> Visual Branding</h3>
+                              <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Primary Color</label>
+                                    <div className="flex gap-2 items-center">
+                                      <input type="color" value={appConfig.primaryColor} onChange={(e) => setAppConfig({ ...appConfig, primaryColor: e.target.value })} className="w-10 h-10 rounded-lg cursor-pointer bg-transparent border-none p-0" />
+                                      <input value={appConfig.primaryColor} onChange={(e) => setAppConfig({ ...appConfig, primaryColor: e.target.value })} className="flex-1 bg-gray-50 dark:bg-slate-800 rounded-xl p-3 text-xs font-mono dark:text-white" />
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Accent Color</label>
+                                    <div className="flex gap-2 items-center">
+                                      <input type="color" value={appConfig.secondaryColor} onChange={(e) => setAppConfig({ ...appConfig, secondaryColor: e.target.value })} className="w-10 h-10 rounded-lg cursor-pointer bg-transparent border-none p-0" />
+                                      <input value={appConfig.secondaryColor} onChange={(e) => setAppConfig({ ...appConfig, secondaryColor: e.target.value })} className="flex-1 bg-gray-50 dark:bg-slate-800 rounded-xl p-3 text-xs font-mono dark:text-white" />
+                                    </div>
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Font Family</label>
+                                  <select 
+                                    className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-4 font-bold text-sm dark:text-white"
+                                    value={appConfig.fontFamily}
+                                    onChange={(e) => setAppConfig({ ...appConfig, fontFamily: e.target.value })}
+                                  >
+                                    <option value="Inter">Inter (Modern)</option>
+                                    <option value="Plus Jakarta Sans">Plus Jakarta (Elegant)</option>
+                                    <option value="Space Grotesk">Space Grotesk (Tech)</option>
+                                    <option value="Cormorant Garamond">Cormorant (Luxury)</option>
+                                    <option value="system-ui">System Default</option>
+                                  </select>
+                                </div>
+                                <button 
+                                  onClick={async () => {
+                                    const { doc, setDoc } = await import('firebase/firestore');
+                                    const { db } = await import('./lib/firebase');
+                                    await setDoc(doc(db, 'appConfig', 'main'), appConfig, { merge: true });
+                                    alert('Settings saved globally!');
+                                  }}
+                                  className="w-full btn-primary py-4 rounded-xl"
+                                >
+                                  Save Branding Settings
+                                </button>
+                              </div>
+                            </div>
                           </div>
-                          <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Logo URL</label>
-                            <input 
-                              className="w-full bg-gray-50 border-none rounded-xl p-4 font-bold text-sm" 
-                              value={appConfig.logoUrl}
-                              placeholder="https://example.com/logo.png"
-                              onChange={async (e) => {
-                                const { doc, setDoc } = await import('firebase/firestore');
-                                const { db } = await import('./lib/firebase');
-                                await setDoc(doc(db, 'appConfig', 'main'), { ...appConfig, logoUrl: e.target.value }, { merge: true });
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                        )}
                     {adminTab === 'loans' && (
                       <div className="space-y-4">
                         {filteredLoans.map((loan) => (
@@ -1910,6 +2059,100 @@ export default function App() {
         </AnimatePresence>
       </main>
       <Footer lang={lang} />
+
+      {/* AI Assistant */}
+      <div className="fixed bottom-24 right-6 md:bottom-10 md:right-10 z-[60]">
+        <AnimatePresence>
+          {showAiAssistant && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.8, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: 20 }}
+              className="bg-white dark:bg-slate-900 w-[90vw] max-w-[380px] h-[500px] rounded-[2.5rem] shadow-2xl border border-gray-100 dark:border-slate-800 flex flex-col overflow-hidden mb-4"
+            >
+              <div className="bg-brand-blue p-6 text-white flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/10 rounded-xl">
+                    <Sparkles className="text-brand-gold" size={18} />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm">{appConfig.name} AI Assistant</h4>
+                    <p className="text-[10px] opacity-60">Powered by Gemini</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowAiAssistant(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+                {aiHistory.length === 0 && (
+                  <div className="text-center py-10 space-y-4">
+                    <div className="w-16 h-16 bg-brand-gold/10 rounded-full flex items-center justify-center mx-auto">
+                      <MessageSquare className="text-brand-gold" size={30} />
+                    </div>
+                    <p className="text-gray-400 text-sm px-10">
+                      {lang === 'sw' 
+                        ? `Habari! Mimi ni msaidizi wako wa ${appConfig.name}. Una swali lolote kuhusu mikopo yetu?` 
+                        : `Hello! I'm your ${appConfig.name} assistant. Do you have any questions about our loans?`}
+                    </p>
+                  </div>
+                )}
+                {aiHistory.map((msg, idx) => (
+                  <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[85%] p-4 rounded-[1.5rem] text-sm ${
+                      msg.role === 'user' 
+                      ? 'bg-brand-blue text-white rounded-tr-none' 
+                      : 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-200 rounded-tl-none pr-8 relative'
+                    }`}>
+                      {msg.parts[0].text}
+                    </div>
+                  </div>
+                ))}
+                {isAiLoading && <div className="flex justify-start">
+                  <div className="bg-gray-100 dark:bg-slate-800 p-4 rounded-[1.5rem] rounded-tl-none"><div className="flex gap-1"><div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" /><div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:0.2s]" /><div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:0.4s]" /></div></div>
+                </div>}
+              </div>
+
+              <div className="p-4 border-t border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-900/50">
+                <form 
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const input = (e.target as any).message;
+                    askAi(input.value);
+                    input.value = '';
+                  }}
+                  className="relative"
+                >
+                  <input 
+                    name="message"
+                    autoComplete="off"
+                    placeholder={lang === 'sw' ? 'Andika swali lako...' : 'Type your question...'} 
+                    className="w-full bg-white dark:bg-slate-800 rounded-2xl py-4 pl-5 pr-14 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue dark:text-white"
+                  />
+                  <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 p-2.5 bg-brand-blue text-white rounded-xl hover:scale-105 transition-all">
+                    <ArrowRight size={18} />
+                  </button>
+                </form>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <motion.button 
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => setShowAiAssistant(!showAiAssistant)}
+          className="bg-brand-gold text-brand-blue p-4 rounded-full shadow-2xl relative group"
+        >
+          <Sparkles size={28} />
+          {!showAiAssistant && (
+             <div className="absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-brand-blue text-white text-[10px] font-black uppercase tracking-widest py-2 px-4 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap hidden md:block">
+               {lang === 'sw' ? 'Uliza AI Assistant' : 'Ask AI Assistant'}
+             </div>
+          )}
+        </motion.button>
+      </div>
 
       {/* Mobile Bottom Nav */}
       <div className="md:hidden fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-[85vw] max-w-[400px]">
