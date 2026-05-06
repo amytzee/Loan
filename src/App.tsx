@@ -27,7 +27,13 @@ import {
   Plus,
   PenTool,
   Paperclip,
-  Users
+  Users,
+  Search,
+  AlertCircle,
+  XCircle,
+  Settings,
+  Mail,
+  Smartphone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -98,6 +104,16 @@ interface LoanFormField {
   label: string;
   type: 'text' | 'number' | 'image' | 'file' | 'tel' | 'textarea' | 'location' | 'guarantors';
   required: boolean;
+}
+
+interface Notification {
+  id?: string;
+  userId: string; // 'all' for broadcast
+  title: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
+  type: 'status' | 'broadcast' | 'alert';
 }
 
 interface LoanProduct {
@@ -813,12 +829,37 @@ export default function App() {
   const [profileData, setProfileData] = useState<any>(null);
   const [applications, setApplications] = useState<any[]>([]);
   const [loanProducts, setLoanProducts] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [publicUsers, setPublicUsers] = useState<any[]>([]);
   const [appConfig, setAppConfig] = useState<AppConfig>({ name: 'Coshve', logoUrl: '' });
-  const [adminTab, setAdminTab] = useState<'loans' | 'users' | 'products' | 'settings'>('loans');
+  const [adminTab, setAdminTab] = useState<'loans' | 'users' | 'products' | 'settings' | 'notifs'>('loans');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showNotifCenter, setShowNotifCenter] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<LoanProduct | null>(null);
   const [editingProduct, setEditingProduct] = useState<LoanProduct | null>(null);
+  const [broadcastMessage, setBroadcastMessage] = useState({ title: '', message: '', userId: 'all' });
+
+  const stats = {
+    total: applications.length,
+    approved: applications.filter(a => a.status === 'Approved').length,
+    pending: applications.filter(a => a.status === 'Pending').length,
+    rejected: applications.filter(a => a.status === 'Rejected').length,
+    totalUsers: allUsers.length
+  };
+
+  const filteredLoans = applications.filter(a => 
+    a.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    a.loanType?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredUsers = allUsers.filter(u => 
+    u.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.phone?.includes(searchTerm)
+  );
+
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -835,6 +876,7 @@ export default function App() {
     let unsubUsers: (() => void) | undefined;
     let unsubApps: (() => void) | undefined;
     let unsubPublicUsers: (() => void) | undefined;
+    let unsubNotifs: (() => void) | undefined;
 
     const initDataFetching = async () => {
       const { collection, onSnapshot, query, orderBy, where, limit } = await import('firebase/firestore');
@@ -845,26 +887,39 @@ export default function App() {
         setPublicUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       });
 
-      if (user?.email === 'admin@gmail.com') {
-        // Admin fetches everything
-        unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
-          setAllUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        });
-
-        unsubApps = onSnapshot(query(collection(db, 'applications'), orderBy('timestamp', 'desc')), (snapshot) => {
-          setApplications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        });
-      } else if (user) {
-        // Normal user fetches only their applications
-        unsubApps = onSnapshot(
-          query(collection(db, 'applications'), where('userId', '==', user.uid), orderBy('timestamp', 'desc')), 
+      if (user) {
+        // Fetch notifications for current user or broadcast
+        unsubNotifs = onSnapshot(
+          query(collection(db, 'notifications'), where('userId', 'in', [user.uid, 'all'])),
           (snapshot) => {
-            setApplications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+            setNotifications(data.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
           }
         );
+
+        if (user.email === 'admin@gmail.com') {
+          // Admin fetches everything
+          unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
+            setAllUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          });
+
+          unsubApps = onSnapshot(query(collection(db, 'applications'), orderBy('timestamp', 'desc')), (snapshot) => {
+            setApplications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          });
+        } else {
+          // Normal user fetches only their applications
+          unsubApps = onSnapshot(
+            query(collection(db, 'applications'), where('userId', '==', user.uid)), 
+            (snapshot) => {
+              const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+              setApplications(data.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+            }
+          );
+        }
       } else {
         setApplications([]);
         setAllUsers([]);
+        setNotifications([]);
       }
     };
 
@@ -873,6 +928,7 @@ export default function App() {
       unsubUsers?.();
       unsubApps?.();
       unsubPublicUsers?.();
+      unsubNotifs?.();
     };
   }, [user]);
 
@@ -969,6 +1025,55 @@ export default function App() {
         user={user} 
         appConfig={appConfig}
       />
+
+      {/* Notification Center Popover */}
+      <AnimatePresence>
+        {showNotifCenter && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setShowNotifCenter(false)} />
+            <motion.div 
+              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+              className="fixed top-20 right-4 md:right-10 w-[90vw] md:w-96 z-50 bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden"
+            >
+              <div className="p-6 border-b border-gray-50 flex items-center justify-between bg-brand-blue text-white">
+                <h3 className="font-bold flex items-center gap-2"><Bell size={18} /> Notifications</h3>
+                <span className="text-[10px] bg-white/20 px-2 py-1 rounded-lg uppercase font-black">{notifications.length} New</span>
+              </div>
+              <div className="max-h-[60vh] overflow-y-auto custom-scrollbar">
+                {notifications.length === 0 ? (
+                  <div className="p-12 text-center text-gray-300">
+                    <p className="text-sm font-bold">Inbox is empty</p>
+                  </div>
+                ) : (
+                  notifications.map((n) => (
+                    <div 
+                      key={n.id} 
+                      onClick={async () => {
+                        if (n.read) return;
+                        const { doc, updateDoc } = await import('firebase/firestore');
+                        const { db } = await import('./lib/firebase');
+                        if (n.id) await updateDoc(doc(db, 'notifications', n.id), { read: true });
+                      }}
+                      className={`p-5 border-b border-gray-50 hover:bg-gray-50 transition-all cursor-pointer relative group ${!n.read ? 'bg-blue-50/50' : ''}`}
+                    >
+                       {!n.read && <div className="absolute left-2 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-brand-gold rounded-full" />}
+                       <div className="flex justify-between items-start mb-1 pl-2">
+                          <p className={`font-bold text-sm ${!n.read ? 'text-brand-blue' : 'text-gray-500'}`}>{n.title}</p>
+                          <span className="text-[8px] text-gray-400 font-bold uppercase">{new Date(n.timestamp).toLocaleDateString()}</span>
+                       </div>
+                       <p className="text-xs text-gray-500 leading-relaxed pl-2">{n.message}</p>
+                       {!n.read && <span className="absolute right-4 bottom-2 text-[8px] font-black uppercase text-brand-blue opacity-0 group-hover:opacity-100 transition-opacity">Click to read</span>}
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       <main className={activeView !== 'home' ? 'pt-24 pb-32' : ''}>
         <AnimatePresence mode="wait">
           {activeView === 'home' && (
@@ -1197,30 +1302,152 @@ export default function App() {
               exit={{ opacity: 0, x: -20 }}
               className="max-w-4xl mx-auto px-4"
             >
-              <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
                 <div>
-                  <h1 className="text-2xl font-display font-bold text-brand-blue">{user?.email === 'admin@gmail.com' ? 'Admin Management' : 'Application History'}</h1>
+                  <h1 className="text-2xl font-display font-bold text-brand-blue">{user?.email === 'admin@gmail.com' ? 'Admin Dashboard' : 'Application History'}</h1>
                   <p className="text-sm text-gray-500">{user?.email === 'admin@gmail.com' ? 'Monitor all system activities' : 'Real-time update of your requests'}</p>
                 </div>
                 {user?.email === 'admin@gmail.com' && (
-                  <div className="flex bg-gray-100 p-1 rounded-2xl overflow-x-auto no-scrollbar">
-                    {(['loans', 'users', 'products', 'settings'] as const).map((tab) => (
-                      <button 
-                        key={tab}
-                        onClick={() => setAdminTab(tab)}
-                        className={`px-4 py-2 rounded-xl text-xs font-bold capitalize transition-all whitespace-nowrap ${adminTab === tab ? 'bg-white text-brand-blue shadow-sm' : 'text-gray-400'}`}
-                      >
-                        {tab}
-                      </button>
-                    ))}
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="relative">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                      <input 
+                        type="text" 
+                        placeholder="Search users or loans..." 
+                        className="pl-12 pr-4 py-3 bg-gray-100 rounded-2xl text-xs font-bold w-full sm:w-64 focus:ring-2 focus:ring-brand-blue/10 outline-none"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex bg-gray-100 p-1 rounded-2xl overflow-x-auto no-scrollbar">
+                      {(['loans', 'users', 'products', 'notifs', 'settings'] as const).map((tab) => (
+                        <button 
+                          key={tab}
+                          onClick={() => {
+                            setAdminTab(tab);
+                            setSearchTerm('');
+                          }}
+                          className={`px-4 py-2 rounded-xl text-xs font-bold capitalize transition-all whitespace-nowrap ${adminTab === tab ? 'bg-white text-brand-blue shadow-sm' : 'text-gray-400'}`}
+                        >
+                          {tab}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
 
+              {user?.email === 'admin@gmail.com' && adminTab !== 'settings' && adminTab !== 'notifs' && (
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-8">
+                  {[
+                    { label: 'Total Apps', value: stats.total, color: 'text-brand-blue', bg: 'bg-blue-50', icon: <History size={16} /> },
+                    { label: 'Pending', value: stats.pending, color: 'text-amber-600', bg: 'bg-amber-50', icon: <AlertCircle size={16} /> },
+                    { label: 'Approved', value: stats.approved, color: 'text-emerald-600', bg: 'bg-emerald-50', icon: <CheckCircle2 size={16} /> },
+                    { label: 'Rejected', value: stats.rejected, color: 'text-rose-600', bg: 'bg-rose-50', icon: <XCircle size={16} /> },
+                    { label: 'System Users', value: stats.totalUsers, color: 'text-indigo-600', bg: 'bg-indigo-50', icon: <Users size={16} /> },
+                  ].map((s, idx) => (
+                    <motion.div 
+                      key={idx} 
+                      whileHover={{ scale: 1.02 }}
+                      className={`${s.bg} p-6 rounded-[2rem] border border-white/50 shadow-sm flex flex-col justify-between h-32 relative overflow-hidden`}
+                    >
+                      <div className="absolute -right-2 -top-2 opacity-5 scale-150">{s.icon}</div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-500/60 mb-1">{s.label}</p>
+                      <div className="flex items-end justify-between">
+                        <p className={`text-3xl font-display font-black ${s.color}`}>{s.value}</p>
+                        <div className={`p-2 rounded-full bg-white/50 ${s.color}`}>{s.icon}</div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+
               <div className="space-y-6">
                 {user?.email === 'admin@gmail.com' ? (
                   <>
-                    {adminTab === 'settings' && (
+                        {adminTab === 'notifs' && (
+                          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 slide-up">
+                             <div className="md:col-span-12 lg:col-span-5 space-y-6">
+                                <div className="app-card space-y-6">
+                                   <h3 className="font-bold text-brand-blue flex items-center gap-2"><Bell className="text-brand-gold" size={18} /> Send Notification</h3>
+                                   <div className="space-y-4">
+                                      <div>
+                                        <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Target Audience</label>
+                                        <select 
+                                          className="w-full bg-gray-50 rounded-xl p-4 font-bold text-sm"
+                                          value={broadcastMessage.userId}
+                                          onChange={(e) => setBroadcastMessage({ ...broadcastMessage, userId: e.target.value })}
+                                        >
+                                          <option value="all">Broadcast to All Users</option>
+                                          {allUsers.map(u => (
+                                            <option key={u.id} value={u.id}>{u.fullName}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                      <div>
+                                        <input 
+                                          placeholder="Notice Title" 
+                                          className="w-full bg-gray-50 rounded-xl p-4 font-bold text-sm"
+                                          value={broadcastMessage.title}
+                                          onChange={(e) => setBroadcastMessage({ ...broadcastMessage, title: e.target.value })}
+                                        />
+                                      </div>
+                                      <div>
+                                        <textarea 
+                                          placeholder="Type your message here..." 
+                                          rows={4}
+                                          className="w-full bg-gray-50 rounded-xl p-4 font-bold text-sm"
+                                          value={broadcastMessage.message}
+                                          onChange={(e) => setBroadcastMessage({ ...broadcastMessage, message: e.target.value })}
+                                        />
+                                      </div>
+                                      <button 
+                                        onClick={async () => {
+                                          if (!broadcastMessage.title || !broadcastMessage.message) return alert('Fill all fields');
+                                          const { collection, addDoc } = await import('firebase/firestore');
+                                          const { db } = await import('./lib/firebase');
+                                          await addDoc(collection(db, 'notifications'), {
+                                            ...broadcastMessage,
+                                            timestamp: new Date().toISOString(),
+                                            read: false,
+                                            type: broadcastMessage.userId === 'all' ? 'broadcast' : 'status'
+                                          });
+                                          setBroadcastMessage({ title: '', message: '', userId: 'all' });
+                                          alert('Notification sent!');
+                                        }}
+                                        className="w-full btn-primary py-4 rounded-xl shadow-xl shadow-brand-blue/20"
+                                      >
+                                        Send Message
+                                      </button>
+                                   </div>
+                                </div>
+                             </div>
+                             <div className="md:col-span-12 lg:col-span-7">
+                                <div className="space-y-4">
+                                   <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400">Sent History</label>
+                                   <div className="space-y-3">
+                                      {notifications.filter(n => n.type === 'broadcast').slice(0, 5).map(n => (
+                                        <div key={n.id} className="app-card flex justify-between items-center group">
+                                           <div>
+                                              <p className="font-bold text-brand-blue text-sm">{n.title}</p>
+                                              <p className="text-xs text-gray-400 line-clamp-1">{n.message}</p>
+                                           </div>
+                                           <button 
+                                             onClick={async () => {
+                                                const { doc, deleteDoc } = await import('firebase/firestore');
+                                                const { db } = await import('./lib/firebase');
+                                                if(confirm('Delete this broadcast?')) await deleteDoc(doc(db, 'notifications', n.id!));
+                                             }}
+                                             className="opacity-0 group-hover:opacity-100 p-2 text-rose-500 transition-all"
+                                           ><X size={16} /></button>
+                                        </div>
+                                      ))}
+                                   </div>
+                                </div>
+                             </div>
+                          </div>
+                        )}
+                        {adminTab === 'settings' && (
                       <div className="app-card space-y-6">
                         <h3 className="font-bold text-brand-blue">App Configuration</h3>
                         <div className="space-y-4">
@@ -1254,7 +1481,7 @@ export default function App() {
                     )}
                     {adminTab === 'loans' && (
                       <div className="space-y-4">
-                        {applications.map((loan) => (
+                        {filteredLoans.map((loan) => (
                           <div key={loan.id} className="app-card flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div className="flex items-center gap-4">
                               <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
@@ -1291,26 +1518,42 @@ export default function App() {
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
-                              <button 
-                                onClick={async () => {
-                                  const { doc, updateDoc } = await import('firebase/firestore');
-                                  const { db } = await import('./lib/firebase');
-                                  await updateDoc(doc(db, 'applications', loan.id), { status: 'Approved' });
-                                }}
-                                className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-emerald-100 transition-colors"
-                              >
-                                Approve
-                              </button>
-                              <button 
-                                onClick={async () => {
-                                  const { doc, updateDoc } = await import('firebase/firestore');
-                                  const { db } = await import('./lib/firebase');
-                                  await updateDoc(doc(db, 'applications', loan.id), { status: 'Rejected' });
-                                }}
-                                className="px-3 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-rose-100 transition-colors"
-                              >
-                                Reject
-                              </button>
+                                  <button 
+                                    onClick={async () => {
+                                      const { doc, updateDoc, collection, addDoc } = await import('firebase/firestore');
+                                      const { db } = await import('./lib/firebase');
+                                      await updateDoc(doc(db, 'applications', loan.id), { status: 'Approved' });
+                                      await addDoc(collection(db, 'notifications'), {
+                                        userId: loan.userId,
+                                        title: 'Loan Approved! 🎉',
+                                        message: `Your ${loan.loanType} loan application has been approved. Please check your dashboard for details.`,
+                                        timestamp: new Date().toISOString(),
+                                        read: false,
+                                        type: 'status'
+                                      });
+                                    }}
+                                    className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-emerald-100 transition-colors"
+                                  >
+                                    Approve
+                                  </button>
+                                  <button 
+                                    onClick={async () => {
+                                      const { doc, updateDoc, collection, addDoc } = await import('firebase/firestore');
+                                      const { db } = await import('./lib/firebase');
+                                      await updateDoc(doc(db, 'applications', loan.id), { status: 'Rejected' });
+                                      await addDoc(collection(db, 'notifications'), {
+                                        userId: loan.userId,
+                                        title: 'Application Update',
+                                        message: `Unfortunately, your ${loan.loanType} loan application was rejected at this time.`,
+                                        timestamp: new Date().toISOString(),
+                                        read: false,
+                                        type: 'status'
+                                      });
+                                    }}
+                                    className="px-3 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-rose-100 transition-colors"
+                                  >
+                                    Reject
+                                  </button>
                               <button 
                                 onClick={async () => {
                                   const { doc, deleteDoc } = await import('firebase/firestore');
@@ -1327,42 +1570,55 @@ export default function App() {
                       </div>
                     )}
                     {adminTab === 'users' && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {allUsers.map((u) => (
-                          <div key={u.id} className="app-card flex flex-col gap-4">
-                            <div className="flex items-center gap-4">
-                              <img src={u.photoURL || 'https://i.pravatar.cc/150?u='+u.id} className="w-12 h-12 rounded-full object-cover" referrerPolicy="no-referrer" />
-                              <div className="flex-1">
-                                <h4 className="font-bold text-brand-blue text-sm flex items-center gap-2">
-                                  {u.fullName} {u.isBlocked && <span className="text-[8px] bg-rose-500 text-white px-1.5 rounded">BLOCKED</span>}
-                                </h4>
-                                <p className="text-xs text-gray-400">{u.phone}</p>
-                                <p className="text-[10px] text-gray-300 font-mono mt-1">{u.email}</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {filteredUsers.map((u) => (
+                          <motion.div 
+                            key={u.id} 
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="app-card group relative overflow-hidden flex flex-col justify-between"
+                          >
+                            <div className="flex items-start gap-4 mb-6 relative z-10">
+                              <div className="relative">
+                                <img src={u.photoURL || 'https://i.pravatar.cc/150?u='+u.id} className="w-14 h-14 rounded-2xl object-cover ring-4 ring-brand-blue/5" referrerPolicy="no-referrer" />
+                                {u.email?.includes('gmail.com') && <div className="absolute -bottom-1 -right-1 bg-white p-1 rounded-full shadow-sm"><img src="https://www.google.com/favicon.ico" className="w-3 h-3" /></div>}
+                                {u.isBlocked && <div className="absolute -top-1 -left-1 bg-rose-500 text-[8px] font-black text-white px-1.5 py-0.5 rounded-lg shadow-lg">BLOCKED</div>}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-bold text-brand-blue truncate group-hover:text-brand-gold transition-colors">{u.fullName || 'Anonymous User'}</h3>
+                                <div className="flex items-center gap-2 text-[10px] text-gray-500 font-medium">
+                                   <Mail size={10} className="shrink-0" /> <span className="truncate">{u.email}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-[10px] text-gray-500 font-medium mt-1">
+                                   <Smartphone size={10} className="shrink-0" /> <span>{u.phone || 'No phone'}</span>
+                                </div>
                               </div>
                             </div>
-                            <div className="flex gap-2">
-                              <button 
-                                onClick={async () => {
-                                  const { doc, updateDoc } = await import('firebase/firestore');
-                                  const { db } = await import('./lib/firebase');
-                                  await updateDoc(doc(db, 'users', u.id), { isBlocked: !u.isBlocked });
-                                }}
-                                className={`flex-1 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest ${u.isBlocked ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}
-                              >
-                                {u.isBlocked ? 'Unblock' : 'Block'}
-                              </button>
-                              <button 
-                                onClick={async () => {
-                                  const { doc, deleteDoc } = await import('firebase/firestore');
-                                  const { db } = await import('./lib/firebase');
-                                  if(confirm('Delete this user?')) await deleteDoc(doc(db, 'users', u.id));
-                                }}
-                                className="px-4 bg-gray-50 text-gray-400 rounded-xl"
-                              >
-                                <X size={14} />
-                              </button>
+                            
+                            <div className="grid grid-cols-2 gap-2 relative z-10">
+                               <button 
+                                 onClick={() => {
+                                   setAdminTab('notifs');
+                                   setBroadcastMessage({ ...broadcastMessage, userId: u.id });
+                                 }}
+                                 className="py-2.5 bg-brand-blue/5 text-brand-blue text-[10px] font-black uppercase rounded-xl hover:bg-brand-blue hover:text-white transition-all flex items-center justify-center gap-2 shadow-sm"
+                               >
+                                 <Bell size={12} /> Message
+                               </button>
+                               <button 
+                                 onClick={async () => {
+                                   const { doc, updateDoc } = await import('firebase/firestore');
+                                   const { db } = await import('./lib/firebase');
+                                   await updateDoc(doc(db, 'users', u.id), { isBlocked: !u.isBlocked });
+                                 }}
+                                 className={`py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${u.isBlocked ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white' : 'bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white'}`}
+                               >
+                                 {u.isBlocked ? 'Unblock' : 'Block'}
+                               </button>
                             </div>
-                          </div>
+                            
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-brand-blue/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
+                          </motion.div>
                         ))}
                       </div>
                     )}
@@ -1654,6 +1910,46 @@ export default function App() {
         </AnimatePresence>
       </main>
       <Footer lang={lang} />
+
+      {/* Mobile Bottom Nav */}
+      <div className="md:hidden fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-[85vw] max-w-[400px]">
+         <div className="bg-brand-blue/80 backdrop-blur-xl text-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(10,54,101,0.3)] px-10 py-5 flex justify-between items-center border border-white/20 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-t from-white/5 to-transparent pointer-events-none" />
+            
+            <button onClick={() => setActiveView('home')} className={`flex flex-col items-center transition-all duration-300 relative z-10 ${activeView === 'home' ? 'scale-110 text-brand-gold' : 'opacity-50 hover:opacity-100'}`}>
+               <Home size={22} strokeWidth={activeView === 'home' ? 2.5 : 2} />
+               <span className="text-[7px] font-black mt-1.5 uppercase tracking-[0.2em]">{lang === 'sw' ? 'Mwanzo' : 'Home'}</span>
+               {activeView === 'home' && <motion.div layoutId="nav-glow" className="absolute -bottom-2 w-1 h-1 bg-brand-gold rounded-full shadow-[0_0_10px_#D4AF37]" />}
+            </button>
+            
+            <button onClick={() => setActiveView('history')} className={`flex flex-col items-center transition-all duration-300 relative z-10 ${activeView === 'history' || activeView === 'apply' ? 'scale-110 text-brand-gold' : 'opacity-50 hover:opacity-100'}`}>
+               <LayoutDashboard size={22} strokeWidth={activeView === 'history' || activeView === 'apply' ? 2.5 : 2} />
+               <span className="text-[7px] font-black mt-1.5 uppercase tracking-[0.2em]">{lang === 'sw' ? 'Mkopo' : 'Dash'}</span>
+               {(activeView === 'history' || activeView === 'apply') && <motion.div layoutId="nav-glow" className="absolute -bottom-2 w-1 h-1 bg-brand-gold rounded-full shadow-[0_0_10px_#D4AF37]" />}
+            </button>
+            
+            <button onClick={() => setShowNotifCenter(!showNotifCenter)} className={`relative flex flex-col items-center transition-all duration-300 relative z-10 ${showNotifCenter ? 'scale-110 text-brand-gold' : 'opacity-50 hover:opacity-100'}`}>
+               <Bell size={22} strokeWidth={showNotifCenter ? 2.5 : 2} />
+               {unreadCount > 0 && (
+                 <motion.span 
+                   initial={{ scale: 0 }}
+                   animate={{ scale: 1 }}
+                   className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 rounded-full border-2 border-brand-blue flex items-center justify-center text-[8px] font-black shadow-lg"
+                 >
+                   {unreadCount}
+                 </motion.span>
+               )}
+               <span className="text-[7px] font-black mt-1.5 uppercase tracking-[0.2em]">{lang === 'sw' ? 'Taarifa' : 'Notice'}</span>
+               {showNotifCenter && <motion.div layoutId="nav-glow" className="absolute -bottom-2 w-1 h-1 bg-brand-gold rounded-full shadow-[0_0_10px_#D4AF37]" />}
+            </button>
+            
+            <button onClick={() => setActiveView('profile')} className={`flex flex-col items-center transition-all duration-300 relative z-10 ${activeView === 'profile' ? 'scale-110 text-brand-gold' : 'opacity-50 hover:opacity-100'}`}>
+               <User size={22} strokeWidth={activeView === 'profile' ? 2.5 : 2} />
+               <span className="text-[7px] font-black mt-1.5 uppercase tracking-[0.2em]">{lang === 'sw' ? 'Akaunti' : 'Me'}</span>
+               {activeView === 'profile' && <motion.div layoutId="nav-glow" className="absolute -bottom-2 w-1 h-1 bg-brand-gold rounded-full shadow-[0_0_10_#D4AF37]" />}
+            </button>
+         </div>
+      </div>
     </div>
   );
 }
