@@ -42,6 +42,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from '@google/genai';
 
+import { auth, db } from './lib/firebase';
 import { AuthView } from './components/AuthView';
 
 // --- Types ---
@@ -508,26 +509,49 @@ const Services = ({ lang, loanProducts, onSelect }: { lang: Language, loanProduc
             return (
               <motion.div 
                 key={p.id || idx}
-                whileHover={{ y: -10 }}
-                className="bento-card group flex flex-col h-full bg-white border border-gray-100 hover:border-brand-gold transition-all duration-500 shadow-sm hover:shadow-2xl hover:shadow-brand-gold/5"
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: idx * 0.1 }}
+                whileHover={{ y: -8, transition: { duration: 0.3 } }}
+                className="group relative h-full flex flex-col p-8 md:p-10 bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 hover:border-brand-gold/30 transition-all duration-500 shadow-xl shadow-slate-200/50 dark:shadow-none hover:shadow-2xl hover:shadow-brand-gold/10"
               >
-                <div className="flex items-center justify-between mb-8">
-                   <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl ${p.color} ring-4 ring-white shadow-lg`}>
-                      {p.iconType === 'emoji' ? p.icon : (p.iconType === 'url' ? <img src={p.icon} className="w-8 h-8 object-contain" /> : <IconComponent size={24} />)}
+                {/* Decorative Pattern */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-brand-gold/5 rounded-bl-full -mr-10 -mt-10 group-hover:scale-110 transition-transform duration-700 opacity-0 group-hover:opacity-100" />
+                
+                <div className="flex items-start justify-between mb-10 relative z-10">
+                   <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-3xl ${p.color} shadow-inner-white ring-8 ring-white/50 dark:ring-slate-800/50 group-hover:rotate-6 transition-transform duration-500`}>
+                      {p.iconType === 'emoji' ? p.icon : (p.iconType === 'url' ? <img src={p.icon} className="w-10 h-10 object-contain" /> : <IconComponent size={32} strokeWidth={1.5} />)}
+                   </div>
+                   <div className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-gold py-1 px-3 bg-brand-gold/5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                     {lang === 'sw' ? 'Mkopo Bora' : 'Top Choice'}
                    </div>
                 </div>
                 
-                <h3 className="text-2xl font-bold text-brand-blue mb-3 group-hover:text-brand-gold transition-colors">{p.title} Loan</h3>
-                <p className="text-slate-500 text-sm md:text-base leading-relaxed mb-8 flex-1">
+                <h3 className="text-2xl md:text-3xl font-display font-bold text-brand-blue dark:text-white mb-4 group-hover:text-brand-gold transition-colors leading-tight">
+                  {p.title} <span className="font-serif italic font-normal text-brand-gold/60">{lang === 'sw' ? 'Mkopo' : 'Loan'}</span>
+                </h3>
+                
+                <p className="text-slate-500 dark:text-slate-400 text-sm md:text-base leading-relaxed mb-auto pb-10">
                   {p.description || translations[lang].hero.desc}
                 </p>
 
-                <button 
-                  onClick={() => onSelect(p)}
-                  className="flex items-center gap-3 font-bold text-sm text-brand-blue group-hover:text-brand-gold group-hover:translate-x-2 transition-all"
-                >
-                  {lang === 'sw' ? 'Omba Sasa' : 'Apply Now'} <ArrowRight size={18} />
-                </button>
+                <div className="pt-6 border-t border-slate-50 dark:border-slate-800/50">
+                  <button 
+                    onClick={() => onSelect(p)}
+                    className="flex items-center gap-3 font-black text-xs uppercase tracking-widest text-brand-blue dark:text-white group-hover:text-brand-gold transition-all"
+                  >
+                    <span className="relative overflow-hidden group/btn">
+                      <span className="block group-hover/btn:-translate-y-full transition-transform duration-300">
+                        {lang === 'sw' ? 'Omba Sasa' : 'Apply Now'}
+                      </span>
+                      <span className="absolute top-0 left-0 block translate-y-full group-hover/btn:translate-y-0 transition-transform duration-300 text-brand-gold">
+                        {lang === 'sw' ? 'Anza Maombi' : 'Get Started'}
+                      </span>
+                    </span>
+                    <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform duration-300" />
+                  </button>
+                </div>
               </motion.div>
             );
           })}
@@ -839,6 +863,43 @@ const Footer = ({ lang }: { lang: Language }) => {
   );
 };
 
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+  }
+}
+
+const handleFirestoreError = (error: any, operationType: OperationType, path: string | null) => {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    operationType,
+    path,
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous
+    }
+  };
+  console.error('Firestore Error:', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+};
+
 export default function App() {
   const [lang, setLang] = useState<Language>('sw');
   const [activeView, setActiveView] = useState('home');
@@ -896,15 +957,25 @@ export default function App() {
   }, [appConfig, user]);
 
   useEffect(() => {
-    const fetchConfig = async () => {
-      const { doc, getDoc } = await import('firebase/firestore');
+    // Real-time config sync
+    let unsub: () => void;
+    const setupSync = async () => {
+      const { doc, onSnapshot } = await import('firebase/firestore');
       const { db } = await import('./lib/firebase');
-      const docSnap = await getDoc(doc(db, 'appConfig', 'main'));
-      if (docSnap.exists()) {
-        setAppConfig(docSnap.data() as AppConfig);
-      }
+      
+      unsub = onSnapshot(doc(db, 'appConfig', 'main'), (docSnap: any) => {
+        if (docSnap.exists()) {
+          setAppConfig(docSnap.data() as AppConfig);
+        }
+      }, (error: any) => {
+        console.error("Config sync error:", error);
+      });
     };
-    fetchConfig();
+    setupSync();
+    
+    return () => {
+      if (unsub) unsub();
+    };
   }, []);
 
   const askAi = async (message: string) => {
@@ -1217,19 +1288,27 @@ export default function App() {
                   const IconComponent = IconMap[item.icon] || Briefcase;
 
                   return (
-                    <button 
+                    <motion.button 
                       key={i} 
-                      className="app-card text-center flex flex-col items-center gap-4 hover:border-brand-blue group" 
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: i * 0.05 }}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="group relative bg-white dark:bg-slate-900 rounded-[2rem] p-6 text-center flex flex-col items-center gap-4 border border-slate-100 dark:border-slate-800 hover:border-brand-gold transition-all duration-300 shadow-lg shadow-slate-200/40 dark:shadow-none" 
                       onClick={() => {
                         setSelectedProduct(item);
                         setActiveView('apply');
                       }}
                     >
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${item.color} group-hover:scale-110 transition-transform text-2xl`}>
+                      <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${item.color} group-hover:rotate-12 transition-transform duration-500 text-3xl shadow-lg ring-4 ring-white/50`}>
                         {item.iconType === 'emoji' ? item.icon : (item.iconType === 'url' ? <img src={item.icon} className="w-8 h-8 object-contain" /> : <IconComponent size={28} />)}
                       </div>
-                      <span className="font-bold text-sm text-brand-blue">{item.title} Loan</span>
-                    </button>
+                      <div>
+                        <h4 className="font-display font-bold text-brand-blue dark:text-white group-hover:text-brand-gold transition-colors">{item.title}</h4>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">{lang === 'sw' ? 'Omba Sasa' : 'Apply Now'}</p>
+                      </div>
+                    </motion.button>
                   );
                 })}
                 {user && ADMIN_EMAILS.includes(user?.email || '') && (
@@ -1662,12 +1741,13 @@ export default function App() {
                                   onClick={async () => {
                                     try {
                                       const { doc, setDoc } = await import('firebase/firestore');
-                                    const { db } = await import('./lib/firebase');
-                                    await setDoc(doc(db, 'appConfig', 'main'), appConfig, { merge: true });
-                                    alert(lang === 'sw' ? 'Mipangilio imehifadhiwa!' : 'Settings saved globally!');
-                                  } catch (error: any) {
-                                    alert(lang === 'sw' ? 'Hitilafu: ' + error.message : 'Error: ' + error.message);
-                                  }
+                                      const { db } = await import('./lib/firebase');
+                                      await setDoc(doc(db, 'appConfig', 'main'), appConfig, { merge: true });
+                                      alert(lang === 'sw' ? 'Mipangilio imehifadhiwa kikamilifu!' : 'Settings saved successfully!');
+                                    } catch (error: any) {
+                                      handleFirestoreError(error, OperationType.WRITE, 'appConfig/main');
+                                      alert(lang === 'sw' ? 'Hitilafu: ' + error.message : 'Error: ' + error.message);
+                                    }
                                   }}
                                   className="w-full btn-primary py-4 rounded-xl"
                                 >

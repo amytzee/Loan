@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&family=Cormorant+Garamond:wght@400;600;700&display=swap');
 @import "tailwindcss";
 
 @layer base {
@@ -27,6 +27,7 @@
 @theme {
   --font-sans: var(--app-font), ui-sans-serif, system-ui;
   --font-display: var(--app-font), sans-serif;
+  --font-serif: "Cormorant Garamond", serif;
   
   --color-brand-blue: var(--primary-color);
   --color-brand-gold: var(--secondary-color);
