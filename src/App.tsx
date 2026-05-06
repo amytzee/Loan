@@ -234,7 +234,7 @@ const translations: Record<Language, Translation> = {
 };
 
 // --- Navbar Component ---
-const Navbar = ({ lang, setLang, activeView, setActiveView }: { lang: Language, setLang: (l: Language) => void, activeView: string, setActiveView: (v: string) => void }) => {
+const Navbar = ({ lang, setLang, activeView, setActiveView, user }: { lang: Language, setLang: (l: Language) => void, activeView: string, setActiveView: (v: string) => void, user: any }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const t = translations[lang].nav;
@@ -316,7 +316,7 @@ const Navbar = ({ lang, setLang, activeView, setActiveView }: { lang: Language, 
             <div className={`p-2 rounded-2xl ${activeView === 'history' ? 'bg-brand-blue text-white' : ''}`}>
               <History size={20} />
             </div>
-            <span className="text-[10px] font-bold mt-1">History</span>
+            <span className="text-[10px] font-bold mt-1">{user?.email === 'admin@gmail.com' ? 'Admin' : 'History'}</span>
           </button>
 
           <button 
@@ -848,6 +848,44 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [profileData, setProfileData] = useState<any>(null);
   const [applications, setApplications] = useState<any[]>([]);
+  const [loanProducts, setLoanProducts] = useState<any[]>([]);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [adminTab, setAdminTab] = useState<'loans' | 'users' | 'products'>('loans');
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      const { collection, onSnapshot, query } = await import('firebase/firestore');
+      const { db } = await import('./lib/firebase');
+      return onSnapshot(query(collection(db, 'loanProducts')), (snapshot) => {
+        const products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        if (products.length === 0) {
+          // Initialize with defaults if empty
+          const defaults = [
+            { icon: 'User', title: 'Personal', color: 'bg-blue-50 text-blue-600' },
+            { icon: 'Home', title: 'House', color: 'bg-emerald-50 text-emerald-600' },
+            { icon: 'Briefcase', title: 'Business', color: 'bg-amber-50 text-amber-600' },
+            { icon: 'GraduationCap', title: 'Education', color: 'bg-purple-50 text-purple-600' },
+          ];
+          setLoanProducts(defaults);
+        } else {
+          setLoanProducts(products);
+        }
+      });
+    };
+    fetchProducts();
+  }, []);
+
+  useEffect(() => {
+    const fetchAllUsers = async () => {
+      if (user?.email !== 'admin@gmail.com') return;
+      const { collection, onSnapshot } = await import('firebase/firestore');
+      const { db } = await import('./lib/firebase');
+      return onSnapshot(collection(db, 'users'), (snapshot) => {
+        setAllUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      });
+    };
+    fetchAllUsers();
+  }, [user]);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -909,7 +947,7 @@ export default function App() {
 
   return (
     <div className="font-sans antialiased text-brand-dark bg-brand-light min-h-screen scroll-smooth overflow-x-hidden selection:bg-brand-gold/30 selection:text-brand-blue">
-      <Navbar lang={lang} setLang={setLang} activeView={activeView} setActiveView={setActiveView} />
+      <Navbar lang={lang} setLang={setLang} activeView={activeView} setActiveView={setActiveView} user={user} />
       <main className={activeView !== 'home' ? 'pt-24 pb-32' : ''}>
         <AnimatePresence mode="wait">
           {activeView === 'home' && (
@@ -940,23 +978,25 @@ export default function App() {
                 <p className="text-gray-500">Pick the best plan for your needs</p>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-                {[
-                  { icon: User, title: 'Personal', color: 'bg-blue-50 text-blue-600' },
-                  { icon: Home, title: 'House', color: 'bg-emerald-50 text-emerald-600' },
-                  { icon: Briefcase, title: 'Business', color: 'bg-amber-50 text-amber-600' },
-                  { icon: GraduationCap, title: 'Education', color: 'bg-purple-50 text-purple-600' },
-                  { icon: Wallet, title: 'Salary', color: 'bg-pink-50 text-pink-600' },
-                  { icon: HandCoins, title: 'Micro', color: 'bg-indigo-50 text-indigo-600' },
-                  { icon: Building2, title: 'Property', color: 'bg-orange-50 text-orange-600' },
-                  { icon: Clock, title: 'Emergency', color: 'bg-rose-50 text-rose-600' },
-                ].map((item, i) => (
-                  <button key={i} className="app-card text-center flex flex-col items-center gap-4 hover:border-brand-blue group" onClick={() => setActiveView('home')}>
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${item.color} group-hover:scale-110 transition-transform`}>
-                      <item.icon size={28} />
-                    </div>
-                    <span className="font-bold text-sm text-brand-blue">{item.title} Loan</span>
+                {loanProducts.map((item, i) => {
+                  const IconMap: Record<string, any> = { User, Home, Briefcase, GraduationCap, Wallet, HandCoins, Building2, Clock };
+                  const IconComponent = IconMap[item.icon] || Briefcase;
+
+                  return (
+                    <button key={i} className="app-card text-center flex flex-col items-center gap-4 hover:border-brand-blue group" onClick={() => setActiveView('home')}>
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${item.color} group-hover:scale-110 transition-transform`}>
+                        <IconComponent size={28} />
+                      </div>
+                      <span className="font-bold text-sm text-brand-blue">{item.title} Loan</span>
+                    </button>
+                  );
+                })}
+                {user?.email === 'admin@gmail.com' && (
+                  <button className="app-card border-dashed border-2 border-gray-200 flex flex-col items-center gap-4 justify-center text-gray-400 hover:border-brand-blue hover:text-brand-blue" onClick={() => setActiveView('history')}>
+                    <History size={28} />
+                    <span className="text-xs font-bold uppercase tracking-widest">Manage Items</span>
                   </button>
-                ))}
+                )}
               </div>
             </motion.div>
           )}
@@ -967,46 +1007,172 @@ export default function App() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="max-w-xl mx-auto px-4"
+              className="max-w-4xl mx-auto px-4"
             >
-              <div className="mb-6">
-                <h1 className="text-2xl font-display font-bold text-brand-blue">Application History</h1>
-                <p className="text-sm text-gray-500">Real-time update of your requests</p>
+              <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl font-display font-bold text-brand-blue">{user?.email === 'admin@gmail.com' ? 'Admin Management' : 'Application History'}</h1>
+                  <p className="text-sm text-gray-500">{user?.email === 'admin@gmail.com' ? 'Monitor all system activities' : 'Real-time update of your requests'}</p>
+                </div>
+                {user?.email === 'admin@gmail.com' && (
+                  <div className="flex bg-gray-100 p-1 rounded-2xl">
+                    {(['loans', 'users', 'products'] as const).map((tab) => (
+                      <button 
+                        key={tab}
+                        onClick={() => setAdminTab(tab)}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold capitalize transition-all ${adminTab === tab ? 'bg-white text-brand-blue shadow-sm' : 'text-gray-400'}`}
+                      >
+                        {tab}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-4">
-                {applications.length > 0 ? applications.map((loan, i) => (
-                  <div key={loan.id} className="app-card flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                        loan.status === 'Approved' ? 'bg-emerald-50 text-emerald-600' : 
-                        loan.status === 'Rejected' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'
-                      }`}>
-                        {loan.status === 'Approved' ? <CheckCircle2 size={24} /> : <Clock size={24} />}
+                {user?.email === 'admin@gmail.com' ? (
+                  <>
+                    {adminTab === 'loans' && (
+                      <div className="space-y-4">
+                        {applications.map((loan) => (
+                          <div key={loan.id} className="app-card flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div className="flex items-center gap-4">
+                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                                loan.status === 'Approved' ? 'bg-emerald-50 text-emerald-600' : 
+                                loan.status === 'Rejected' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'
+                              }`}>
+                                <Building2 size={24} />
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-brand-blue flex items-center gap-2">
+                                  {loan.fullName} <span className="text-[10px] bg-gray-100 px-2 rounded text-gray-500">{loan.loanType}</span>
+                                </h4>
+                                <p className="text-xs text-gray-400">{loan.phone} • {new Date(loan.timestamp).toLocaleString()}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button 
+                                onClick={async () => {
+                                  const { doc, updateDoc } = await import('firebase/firestore');
+                                  const { db } = await import('./lib/firebase');
+                                  await updateDoc(doc(db, 'applications', loan.id), { status: 'Approved' });
+                                }}
+                                className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-emerald-100 transition-colors"
+                              >
+                                Approve
+                              </button>
+                              <button 
+                                onClick={async () => {
+                                  const { doc, updateDoc } = await import('firebase/firestore');
+                                  const { db } = await import('./lib/firebase');
+                                  await updateDoc(doc(db, 'applications', loan.id), { status: 'Rejected' });
+                                }}
+                                className="px-3 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-rose-100 transition-colors"
+                              >
+                                Reject
+                              </button>
+                              <button 
+                                onClick={async () => {
+                                  const { doc, deleteDoc } = await import('firebase/firestore');
+                                  const { db } = await import('./lib/firebase');
+                                  if(confirm('Delete application?')) await deleteDoc(doc(db, 'applications', loan.id));
+                                }}
+                                className="p-1.5 text-gray-300 hover:text-rose-500"
+                              >
+                                <X size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      <div>
-                        <h4 className="font-bold text-brand-blue">{loan.loanType}</h4>
-                        <p className="text-xs text-gray-400">{new Date(loan.timestamp).toLocaleDateString()}</p>
+                    )}
+                    {adminTab === 'users' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {allUsers.map((u) => (
+                          <div key={u.id} className="app-card flex items-center gap-4">
+                            <img src={u.photoURL || 'https://i.pravatar.cc/150?u='+u.id} className="w-12 h-12 rounded-full object-cover" referrerPolicy="no-referrer" />
+                            <div>
+                              <h4 className="font-bold text-brand-blue text-sm">{u.fullName}</h4>
+                              <p className="text-xs text-gray-400">{u.phone}</p>
+                              <p className="text-[10px] text-gray-300 font-mono mt-1">{u.email}</p>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-brand-blue">TZS {Number(loan.amount).toLocaleString()}</p>
-                      <p className={`text-[10px] font-black uppercase tracking-widest ${
-                         loan.status === 'Approved' ? 'text-emerald-500' : 
-                         loan.status === 'Rejected' ? 'text-rose-500' : 'text-amber-500'
-                      }`}>{loan.status}</p>
-                    </div>
-                  </div>
-                )) : (
-                  <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-200">
-                    <History className="mx-auto text-gray-200 mb-4" size={48} />
-                    <p className="text-gray-400 font-medium whitespace-pre-wrap">
-                      {lang === 'sw' ? 'Huna maombi yoyote bado.\nAnza maombi yako leo!' : 'No applications found yet.\nStart your application today!'}
-                    </p>
-                    <button onClick={() => setActiveView('home')} className="mt-6 text-brand-blue font-bold underline">
-                      {lang === 'sw' ? 'Omba Mkopo' : 'Apply Now'}
-                    </button>
-                  </div>
+                    )}
+                    {adminTab === 'products' && (
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                         {loanProducts.map((p) => (
+                           <div key={p.id || p.title} className="app-card border-2 border-gray-50 flex flex-col items-center gap-2">
+                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${p.color}`}>
+                                {p.title[0]}
+                             </div>
+                             <span className="font-bold text-xs">{p.title}</span>
+                             {p.id && (
+                               <button 
+                                onClick={async () => {
+                                  const { doc, deleteDoc } = await import('firebase/firestore');
+                                  const { db } = await import('./lib/firebase');
+                                  await deleteDoc(doc(db, 'loanProducts', p.id));
+                                }}
+                                className="text-[10px] text-rose-500 font-bold mt-2"
+                               >Delete</button>
+                             )}
+                           </div>
+                         ))}
+                         <button 
+                          onClick={async () => {
+                            const title = prompt('Loan Title?');
+                            if (!title) return;
+                            const { collection, addDoc } = await import('firebase/firestore');
+                            const { db } = await import('./lib/firebase');
+                            await addDoc(collection(db, 'loanProducts'), {
+                              title,
+                              icon: 'Briefcase',
+                              color: 'bg-gray-100 text-gray-600'
+                            });
+                          }}
+                          className="app-card border-dashed border-2 flex items-center justify-center text-gray-400 text-xs font-bold"
+                         >+ Add New</button>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {applications.length > 0 ? applications.map((loan, i) => (
+                      <div key={loan.id} className="app-card flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                            loan.status === 'Approved' ? 'bg-emerald-50 text-emerald-600' : 
+                            loan.status === 'Rejected' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'
+                          }`}>
+                            {loan.status === 'Approved' ? <CheckCircle2 size={24} /> : <Clock size={24} />}
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-brand-blue">{loan.loanType}</h4>
+                            <p className="text-xs text-gray-400">{new Date(loan.timestamp).toLocaleDateString()}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-brand-blue">TZS {Number(loan.amount).toLocaleString()}</p>
+                          <p className={`text-[10px] font-black uppercase tracking-widest ${
+                             loan.status === 'Approved' ? 'text-emerald-500' : 
+                             loan.status === 'Rejected' ? 'text-rose-500' : 'text-amber-500'
+                          }`}>{loan.status}</p>
+                        </div>
+                      </div>
+                    )) : (
+                      <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-200">
+                        <History className="mx-auto text-gray-200 mb-4" size={48} />
+                        <p className="text-gray-400 font-medium whitespace-pre-wrap">
+                          {lang === 'sw' ? 'Huna maombi yoyote bado.\nAnza maombi yako leo!' : 'No applications found yet.\nStart your application today!'}
+                        </p>
+                        <button onClick={() => setActiveView('home')} className="mt-6 text-brand-blue font-bold underline">
+                          {lang === 'sw' ? 'Omba Mkopo' : 'Apply Now'}
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </motion.div>
