@@ -856,6 +856,7 @@ export default function App() {
     fontFamily: 'Inter',
     themeMode: 'system'
   });
+  const [calcAmount, setCalcAmount] = useState<number>(0);
   const [showAiAssistant, setShowAiAssistant] = useState(false);
   const [aiHistory, setAiHistory] = useState<{role: 'user' | 'model', parts: {text: string}[]}[]>([]);
   const [isAiLoading, setIsAiLoading] = useState(false);
@@ -912,6 +913,8 @@ export default function App() {
     setAiHistory(newHistory);
 
     try {
+      const statsContext = `The user has ${applications.length} loan applications. ${applications.length > 0 ? `Current latest loan status: ${applications[0].status} for a ${applications[0].loanType} loan of ${applications[0].amount}.` : 'They have not applied for any loans yet.'}`;
+
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
@@ -919,8 +922,9 @@ export default function App() {
         config: {
           systemInstruction: `You are the AI Assistant for ${appConfig.name}, a microfinance institution licensed by BoT. 
           The customer's current language preference is ${lang === 'sw' ? 'Swahili' : 'English'}.
+          CONTEXT: ${statsContext}
           Answer questions about loans (Business, Rental, School Fees, Personal), application processes, and other microfinance services.
-          Be helpful, professional, and friendly. If you don't know something about a specific application, tell them to check their dashboard or contact support.`
+          Be helpful, professional, and friendly. You can see the user's loan status above; use it to answer questions about their specific situation if they ask.`
         }
       });
 
@@ -1256,6 +1260,46 @@ export default function App() {
                   <div>
                     <h1 className="text-2xl font-display font-bold text-brand-blue">{selectedProduct?.title} Loan</h1>
                     <p className="text-gray-400 text-sm mt-1">{selectedProduct?.description}</p>
+                  </div>
+                </div>
+
+                {/* Loan Calculator */}
+                <div className="bg-brand-blue/5 dark:bg-slate-800/50 p-6 rounded-[2rem] border border-brand-blue/10 slide-up">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2 bg-brand-blue/10 rounded-xl text-brand-blue">
+                      <History size={18} />
+                    </div>
+                    <h4 className="font-bold text-sm text-brand-blue dark:text-white">{lang === 'sw' ? 'Kikokotoo cha Mkopo' : 'Loan Calculator'}</h4>
+                  </div>
+                  <div className="space-y-6">
+                    <div>
+                      <p className="text-[10px] font-black uppercase text-gray-400 mb-3">{lang === 'sw' ? 'Weka Kiasi cha Mkopo' : 'Enter Loan Amount'}</p>
+                      <input 
+                        type="number" 
+                        placeholder={lang === 'sw' ? 'Mfano: 1,000,000' : 'e.g. 1,000,000'}
+                        value={calcAmount || ''}
+                        onChange={(e) => setCalcAmount(Number(e.target.value))}
+                        className="w-full bg-white dark:bg-slate-900 border-none rounded-2xl py-4 px-6 font-display font-black text-xl text-brand-blue dark:text-brand-gold focus:ring-2 focus:ring-brand-blue/20 outline-none"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-4 bg-white/50 dark:bg-slate-900/50 rounded-2xl border border-gray-100 dark:border-slate-800">
+                        <p className="text-[8px] font-black uppercase text-gray-400 mb-1">{lang === 'sw' ? 'Marejesho / Mwezi' : 'Monthly Payment'}</p>
+                        <p className="font-display font-bold text-brand-blue dark:text-white">
+                          {new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS', maximumFractionDigits: 0 }).format(
+                            calcAmount ? (calcAmount * 1.15 / 12) : 0
+                          )}
+                        </p>
+                      </div>
+                      <div className="p-4 bg-white/50 dark:bg-slate-900/50 rounded-2xl border border-gray-100 dark:border-slate-800">
+                        <p className="text-[8px] font-black uppercase text-gray-400 mb-1">{lang === 'sw' ? 'Jumla (Riba 15%)' : 'Total (15% Interest)'}</p>
+                        <p className="font-display font-bold text-emerald-600">
+                          {new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS', maximumFractionDigits: 0 }).format(
+                            calcAmount ? (calcAmount * 1.15) : 0
+                          )}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -1951,27 +1995,67 @@ export default function App() {
                 ) : (
                   <>
                     {applications.length > 0 ? applications.map((loan, i) => (
-                      <div key={loan.id} className="app-card flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                            loan.status === 'Approved' ? 'bg-emerald-50 text-emerald-600' : 
-                            loan.status === 'Rejected' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'
-                          }`}>
-                            {loan.status === 'Approved' ? <CheckCircle2 size={24} /> : <Clock size={24} />}
+                      <motion.div 
+                        key={loan.id} 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.1 }}
+                        className="app-card group hover:shadow-xl transition-all duration-500 space-y-6"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${
+                              loan.status === 'Approved' ? 'bg-emerald-50 text-emerald-600' : 
+                              loan.status === 'Rejected' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'
+                            }`}>
+                              {loan.status === 'Approved' ? <CheckCircle2 size={24} /> : (loan.status === 'Rejected' ? <XCircle size={24} /> : <Clock size={24} />)}
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-brand-blue group-hover:text-brand-gold transition-colors">{loan.loanType} Project</h4>
+                              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest">{new Date(loan.timestamp).toLocaleDateString()}</p>
+                            </div>
                           </div>
-                          <div>
-                            <h4 className="font-bold text-brand-blue">{loan.loanType}</h4>
-                            <p className="text-xs text-gray-400">{new Date(loan.timestamp).toLocaleDateString()}</p>
+                          <div className="text-right">
+                            <p className="font-display font-black text-brand-blue text-lg">
+                              {new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS', maximumFractionDigits: 0 }).format(loan.amount)}
+                            </p>
+                            <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-lg ${
+                               loan.status === 'Approved' ? 'bg-emerald-50 text-emerald-600' : 
+                               loan.status === 'Rejected' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'
+                            }`}>{loan.status}</span>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className="font-bold text-brand-blue">TZS {Number(loan.amount).toLocaleString()}</p>
-                          <p className={`text-[10px] font-black uppercase tracking-widest ${
-                             loan.status === 'Approved' ? 'text-emerald-500' : 
-                             loan.status === 'Rejected' ? 'text-rose-500' : 'text-amber-500'
-                          }`}>{loan.status}</p>
+
+                        {/* Visual Timeline */}
+                        <div className="flex items-center gap-1 pt-6 border-t border-gray-50 dark:border-slate-800">
+                          {[
+                            { label: lang === 'sw' ? 'Mapokezi' : 'Submitted', active: true },
+                            { label: lang === 'sw' ? 'Uhakiki' : 'Review', active: loan.status !== 'Pending' },
+                            { label: lang === 'sw' ? 'Idhini' : 'Approval', active: loan.status === 'Approved' || loan.status === 'Rejected' },
+                            { label: lang === 'sw' ? 'Gawio' : 'Payout', active: loan.status === 'Approved' }
+                          ].map((step, idx, arr) => (
+                            <div key={idx} className="flex-1 flex flex-col items-center gap-2 group/step relative">
+                              <div className={`w-3 h-3 rounded-full border-4 ${
+                                step.active 
+                                ? (loan.status === 'Rejected' && idx === 2 ? 'bg-rose-500 border-rose-100' : 'bg-emerald-500 border-emerald-100') 
+                                : 'bg-gray-200 border-white'
+                              } relative z-10 transition-all duration-700`} />
+                              
+                              <span className={`text-[7px] font-black uppercase tracking-tight text-center ${
+                                step.active ? 'text-gray-700 dark:text-slate-200' : 'text-gray-300'
+                              }`}>{step.label}</span>
+
+                              {idx < arr.length - 1 && (
+                                <div className={`absolute h-[2px] w-full top-1.5 left-1/2 -z-0 ${
+                                  step.active && arr[idx+1].active 
+                                  ? (loan.status === 'Rejected' && idx === 1 ? 'bg-rose-200' : 'bg-emerald-200') 
+                                  : 'bg-gray-100'
+                                }`} />
+                              )}
+                            </div>
+                          ))}
                         </div>
-                      </div>
+                      </motion.div>
                     )) : (
                       <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-200">
                         <History className="mx-auto text-gray-200 mb-4" size={48} />
