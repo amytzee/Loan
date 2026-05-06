@@ -335,7 +335,7 @@ const Navbar = ({ lang, setLang, activeView, setActiveView, user }: { lang: Lang
 };
 
 // --- Hero Component ---
-const Hero = ({ lang }: { lang: Language }) => {
+const Hero = ({ lang, users }: { lang: Language, users: any[] }) => {
   const t = translations[lang].hero;
   return (
     <section id="home" className="relative min-h-[90vh] md:min-h-[95vh] flex items-center pt-24 pb-12 md:pb-24 overflow-hidden bg-brand-dark">
@@ -369,19 +369,21 @@ const Hero = ({ lang }: { lang: Language }) => {
             <a href="#apply" className="group bg-brand-gold text-brand-blue px-8 md:px-10 py-4 md:py-5 rounded-2xl font-black text-base md:text-lg flex items-center justify-center gap-3 hover:bg-white transition-all shadow-2xl shadow-brand-gold/20">
               {t.cta} <ArrowRight size={22} className="group-hover:translate-x-1 transition-transform" />
             </a>
-            <div className="flex -space-x-3 items-center justify-center sm:justify-start">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="w-10 h-10 md:w-12 md:h-12 rounded-full border-4 border-brand-dark bg-slate-800 flex items-center justify-center overflow-hidden">
-                  <img src={`https://i.pravatar.cc/100?u=${lang}${i}`} alt="user" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                </div>
-              ))}
-              <div className="pl-6">
-                <p className="text-white font-bold text-xs md:text-sm">{t.stats}</p>
-                <div className="flex gap-0.5 text-brand-gold">
-                  {[1, 2, 3, 4, 5].map((s) => <span key={s} className="text-[8px] md:text-[10px]">★</span>)}
+            {users.length > 0 && (
+              <div className="flex -space-x-4 items-center justify-center sm:justify-start">
+                {users.map((u, i) => (
+                  <div key={u.id || i} className="w-10 h-10 md:w-14 md:h-14 rounded-full border-4 border-brand-dark bg-slate-800 flex items-center justify-center overflow-hidden hover:scale-110 hover:z-10 transition-all cursor-pointer">
+                    <img src={u.photoURL || `https://i.pravatar.cc/100?u=${u.id}`} alt="user" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  </div>
+                ))}
+                <div className="pl-8">
+                  <p className="text-white font-black text-xs md:text-sm tracking-tight">{t.stats}</p>
+                  <div className="flex gap-1 text-brand-gold">
+                    {[1, 2, 3, 4, 5].map((s) => <span key={s} className="text-[10px] md:text-xs">★</span>)}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </motion.div>
 
@@ -850,15 +852,22 @@ export default function App() {
   const [applications, setApplications] = useState<any[]>([]);
   const [loanProducts, setLoanProducts] = useState<any[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [publicUsers, setPublicUsers] = useState<any[]>([]);
   const [adminTab, setAdminTab] = useState<'loans' | 'users' | 'products'>('loans');
 
   useEffect(() => {
     let unsubUsers: (() => void) | undefined;
     let unsubApps: (() => void) | undefined;
+    let unsubPublicUsers: (() => void) | undefined;
 
     const initDataFetching = async () => {
-      const { collection, onSnapshot, query, orderBy, where } = await import('firebase/firestore');
+      const { collection, onSnapshot, query, orderBy, where, limit } = await import('firebase/firestore');
       const { db } = await import('./lib/firebase');
+
+      // Always fetch a few public users for social proof
+      unsubPublicUsers = onSnapshot(query(collection(db, 'users'), limit(5)), (snapshot) => {
+        setPublicUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      });
 
       if (user?.email === 'admin@gmail.com') {
         // Admin fetches everything
@@ -887,6 +896,7 @@ export default function App() {
     return () => {
       unsubUsers?.();
       unsubApps?.();
+      unsubPublicUsers?.();
     };
   }, [user]);
 
@@ -931,9 +941,22 @@ export default function App() {
         setUser(u);
         if (u) {
           const docRef = doc(db, 'users', u.uid);
+          const { getDoc, setDoc } = await import('firebase/firestore');
           const docSnap = await getDoc(docRef);
+          
           if (docSnap.exists()) {
             setProfileData(docSnap.data());
+          } else {
+            // Create user profile on first login
+            const newProfile = {
+              fullName: u.displayName || 'Client',
+              email: u.email,
+              photoURL: u.photoURL,
+              phone: '',
+              createdAt: new Date().toISOString()
+            };
+            await setDoc(docRef, newProfile);
+            setProfileData(newProfile);
           }
         } else {
           setProfileData(null);
@@ -966,7 +989,7 @@ export default function App() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
-              <Hero lang={lang} />
+              <Hero lang={lang} users={publicUsers} />
               <Services lang={lang} />
               <Process lang={lang} />
               <LoanCalculator lang={lang} />
