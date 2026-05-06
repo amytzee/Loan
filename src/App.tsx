@@ -27,6 +27,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
+import { AuthView } from './components/AuthView';
+
 // --- Types ---
 type Language = 'sw' | 'en';
 
@@ -660,7 +662,7 @@ const LoanCalculator = ({ lang }: { lang: Language }) => {
 };
 
 // --- Contact Form ---
-const ContactForm = ({ lang }: { lang: Language }) => {
+const ContactForm = ({ lang, user }: { lang: Language, user: any }) => {
   const t = translations[lang].contact;
   return (
     <section id="apply" className="py-20 md:py-32 bg-white">
@@ -717,7 +719,8 @@ const ContactForm = ({ lang }: { lang: Language }) => {
                 loanType: formData.get('loanType'),
                 amount: formData.get('amount'),
                 timestamp: new Date().toISOString(),
-                status: 'Pending'
+                status: 'Pending',
+                userId: user?.uid || null // Link to user if logged in
               };
               
               try {
@@ -843,14 +846,26 @@ export default function App() {
   const [lang, setLang] = useState<Language>('sw');
   const [activeView, setActiveView] = useState('home');
   const [user, setUser] = useState<any>(null);
+  const [profileData, setProfileData] = useState<any>(null);
   const [applications, setApplications] = useState<any[]>([]);
 
   useEffect(() => {
     const initAuth = async () => {
-      const { auth } = await import('./lib/firebase');
+      const { auth, db } = await import('./lib/firebase');
       const { onAuthStateChanged } = await import('firebase/auth');
-      onAuthStateChanged(auth, (u) => {
+      const { doc, getDoc } = await import('firebase/firestore');
+      
+      onAuthStateChanged(auth, async (u) => {
         setUser(u);
+        if (u) {
+          const docRef = doc(db, 'users', u.uid);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            setProfileData(docSnap.data());
+          }
+        } else {
+          setProfileData(null);
+        }
       });
     };
     initAuth();
@@ -858,9 +873,19 @@ export default function App() {
 
   useEffect(() => {
     const fetchApps = async () => {
-      const { collection, query, orderBy, onSnapshot } = await import('firebase/firestore');
+      const { collection, query, orderBy, onSnapshot, where } = await import('firebase/firestore');
       const { db } = await import('./lib/firebase');
-      const q = query(collection(db, 'applications'), orderBy('timestamp', 'desc'));
+      
+      let q;
+      if (user?.email === 'admin@gmail.com') {
+        q = query(collection(db, 'applications'), orderBy('timestamp', 'desc'));
+      } else if (user) {
+        q = query(collection(db, 'applications'), where('userId', '==', user.uid), orderBy('timestamp', 'desc'));
+      } else {
+        setApplications([]);
+        return;
+      }
+
       return onSnapshot(q, (snapshot) => {
         const apps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setApplications(apps);
@@ -869,7 +894,7 @@ export default function App() {
     if (activeView === 'history') {
       fetchApps();
     }
-  }, [activeView]);
+  }, [activeView, user]);
 
   const handleLogin = async () => {
     try {
@@ -898,7 +923,7 @@ export default function App() {
               <Services lang={lang} />
               <Process lang={lang} />
               <LoanCalculator lang={lang} />
-              <ContactForm lang={lang} />
+              <ContactForm lang={lang} user={user} />
             </motion.div>
           )}
 
@@ -998,27 +1023,39 @@ export default function App() {
               {user ? (
                 <div className="text-center mb-8">
                   <div className="relative w-24 h-24 mx-auto mb-4">
-                    <img src={user.photoURL} alt="profile" className="w-full h-full rounded-full border-4 border-white shadow-xl" referrerPolicy="no-referrer" />
+                    <img src={user.photoURL || profileData?.photoURL || 'https://i.pravatar.cc/150?u=' + user.uid} alt="profile" className="w-full h-full rounded-full border-4 border-white shadow-xl object-cover" referrerPolicy="no-referrer" />
                     <div className="absolute bottom-0 right-0 w-6 h-6 bg-emerald-500 border-2 border-white rounded-full" />
                   </div>
-                  <h2 className="text-2xl font-display font-bold text-brand-blue">{user.displayName}</h2>
-                  <p className="text-gray-400">{user.email}</p>
+                  <h2 className="text-2xl font-display font-bold text-brand-blue">
+                    {user.displayName || profileData?.fullName}
+                    {user.email === 'admin@gmail.com' && <span className="ml-2 text-[10px] bg-brand-gold text-brand-blue px-2 py-0.5 rounded-full">ADMIN</span>}
+                  </h2>
+                  <p className="text-gray-400">{user.email || profileData?.phone}</p>
+                  
+                  {user.email === 'admin@gmail.com' && (
+                    <div className="mt-6 bg-brand-blue text-white p-4 rounded-2xl text-left">
+                       <p className="text-[10px] font-black uppercase tracking-widest opacity-50 mb-2">Admin Stats</p>
+                       <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-2xl font-bold">{applications.length}</p>
+                            <p className="text-xs opacity-60">Total Apps</p>
+                          </div>
+                           <div>
+                            <p className="text-2xl font-bold">12</p>
+                            <p className="text-xs opacity-60">Waitlist</p>
+                          </div>
+                       </div>
+                    </div>
+                  )}
+
                   <button onClick={() => { 
                     import('./lib/firebase').then(({ auth }) => auth.signOut());
                     setUser(null);
-                  }} className="mt-4 text-xs font-bold text-rose-500 uppercase tracking-widest">Sign Out</button>
+                    setProfileData(null);
+                  }} className="mt-6 text-xs font-bold text-rose-500 uppercase tracking-widest hover:underline">Sign Out</button>
                 </div>
               ) : (
-                <div className="text-center py-12 bg-white rounded-[2.5rem] shadow-xl border border-gray-50 px-8 mb-8">
-                   <div className="w-20 h-20 bg-brand-blue/5 rounded-3xl flex items-center justify-center mx-auto mb-6 text-brand-blue">
-                      <ShieldCheck size={40} />
-                   </div>
-                   <h2 className="text-2xl font-display font-bold text-brand-blue mb-3">Welcome to Coshve</h2>
-                   <p className="text-gray-500 mb-8 leading-relaxed">Securely manage your loans and view your application status in real-time.</p>
-                   <button onClick={handleLogin} className="w-full btn-primary flex items-center justify-center gap-3">
-                      <Globe size={20} /> Continue with Google
-                   </button>
-                </div>
+                <AuthView lang={lang} onSuccess={() => setActiveView('profile')} />
               )}
 
               <div className="space-y-3">
