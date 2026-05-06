@@ -23,7 +23,11 @@ import {
   User,
   History,
   LayoutDashboard,
-  Bell
+  Bell,
+  Plus,
+  PenTool,
+  Paperclip,
+  Users
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -92,7 +96,7 @@ interface AppConfig {
 
 interface LoanFormField {
   label: string;
-  type: 'text' | 'number' | 'image' | 'tel';
+  type: 'text' | 'number' | 'image' | 'file' | 'tel' | 'textarea' | 'location' | 'guarantors';
   required: boolean;
 }
 
@@ -100,7 +104,7 @@ interface LoanProduct {
   id?: string;
   title: string;
   description: string;
-  icon: string; // Emoji or Lucide name or URL
+  icon: string;
   iconType: 'emoji' | 'lucide' | 'url';
   color: string;
   formFields: LoanFormField[];
@@ -814,6 +818,7 @@ export default function App() {
   const [appConfig, setAppConfig] = useState<AppConfig>({ name: 'Coshve', logoUrl: '' });
   const [adminTab, setAdminTab] = useState<'loans' | 'users' | 'products' | 'settings'>('loans');
   const [selectedProduct, setSelectedProduct] = useState<LoanProduct | null>(null);
+  const [editingProduct, setEditingProduct] = useState<LoanProduct | null>(null);
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -1064,9 +1069,36 @@ export default function App() {
                   
                   const formData = new FormData(e.currentTarget);
                   const data: any = {};
-                  selectedProduct?.formFields.forEach(f => {
-                    data[f.label] = formData.get(f.label);
-                  });
+                  
+                  // Helper function to convert File to Base64
+                  const fileToBase64 = (file: File): Promise<string> => {
+                    return new Promise((resolve, reject) => {
+                      const reader = new FileReader();
+                      reader.readAsDataURL(file);
+                      reader.onload = () => resolve(reader.result as string);
+                      reader.onerror = error => reject(error);
+                    });
+                  };
+
+                  for (const f of (selectedProduct?.formFields || [])) {
+                    if (f.type === 'file' || f.type === 'image') {
+                      const file = formData.get(f.label) as File;
+                      if (file && file.size > 0) {
+                        data[f.label] = await fileToBase64(file);
+                      }
+                    } else if (f.type === 'guarantors') {
+                      data[f.label] = {
+                        name1: formData.get(`${f.label}_name1`),
+                        phone1: formData.get(`${f.label}_phone1`),
+                        residence1: formData.get(`${f.label}_res1`),
+                        name2: formData.get(`${f.label}_name2`),
+                        phone2: formData.get(`${f.label}_phone2`),
+                        residence2: formData.get(`${f.label}_res2`),
+                      };
+                    } else {
+                      data[f.label] = formData.get(f.label);
+                    }
+                  }
 
                   try {
                     const { collection, addDoc } = await import('firebase/firestore');
@@ -1078,7 +1110,7 @@ export default function App() {
                       loanType: selectedProduct?.title,
                       timestamp: new Date().toISOString(),
                       status: 'Pending',
-                      amount: data['Amount'] || 0,
+                      amount: data['Amount'] || data['Loan Amount'] || 0,
                       customData: data
                     });
                     alert('Application submitted successfully!');
@@ -1090,15 +1122,62 @@ export default function App() {
                 }}>
                   <div className="grid grid-cols-1 gap-6">
                     {selectedProduct?.formFields.map((field, i) => (
-                      <div key={i}>
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">{field.label}</label>
-                        <input 
-                          name={field.label}
-                          type={field.type} 
-                          required={field.required}
-                          placeholder={`Enter your ${field.label.toLowerCase()}`}
-                          className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 font-bold text-sm focus:ring-2 focus:ring-brand-blue/10 outline-none"
-                        />
+                      <div key={i} className="space-y-4">
+                        <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400">{field.label} {field.required && <span className="text-rose-500">*</span>}</label>
+                        
+                        {field.type === 'textarea' ? (
+                          <textarea 
+                            name={field.label}
+                            required={field.required}
+                            rows={3}
+                            placeholder={`Describe your ${field.label.toLowerCase()}`}
+                            className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 font-bold text-sm focus:ring-2 focus:ring-brand-blue/10 outline-none"
+                          />
+                        ) : field.type === 'file' || field.type === 'image' ? (
+                          <div className="relative">
+                            <input 
+                              type="file"
+                              name={field.label}
+                              required={field.required}
+                              accept={field.type === 'image' ? 'image/*' : '*/*'}
+                              className="w-full bg-gray-50 border-none rounded-2xl py-8 px-6 font-bold text-sm text-center border-2 border-dashed border-gray-200"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-gray-400 gap-2">
+                               <Paperclip size={18} />
+                               <span className="text-xs">Click to upload documets</span>
+                            </div>
+                          </div>
+                        ) : field.type === 'guarantors' ? (
+                          <div className="space-y-4 bg-gray-50 p-6 rounded-3xl border border-gray-100">
+                             <div className="space-y-3">
+                               <p className="text-[10px] font-bold text-brand-blue uppercase">Guarantor 1</p>
+                               <input name={`${field.label}_name1`} placeholder="Full Name" className="w-full bg-white rounded-xl py-3 px-4 text-sm font-bold" required={field.required} />
+                               <input name={`${field.label}_phone1`} placeholder="Phone Number" className="w-full bg-white rounded-xl py-3 px-4 text-sm font-bold" required={field.required} />
+                               <input name={`${field.label}_res1`} placeholder="Place of Residence" className="w-full bg-white rounded-xl py-3 px-4 text-sm font-bold" required={field.required} />
+                             </div>
+                             <hr className="border-gray-200/50" />
+                             <div className="space-y-3">
+                               <p className="text-[10px] font-bold text-brand-blue uppercase">Guarantor 2</p>
+                               <input name={`${field.label}_name2`} placeholder="Full Name" className="w-full bg-white rounded-xl py-3 px-4 text-sm font-bold" required={field.required} />
+                               <input name={`${field.label}_phone2`} placeholder="Phone Number" className="w-full bg-white rounded-xl py-3 px-4 text-sm font-bold" required={field.required} />
+                               <input name={`${field.label}_res2`} placeholder="Place of Residence" className="w-full bg-white rounded-xl py-3 px-4 text-sm font-bold" required={field.required} />
+                             </div>
+                          </div>
+                        ) : field.type === 'location' ? (
+                           <div className="grid grid-cols-2 gap-4">
+                             <input name={field.label} placeholder="Street/Area" className="col-span-2 w-full bg-gray-50 rounded-2xl py-4 px-6 text-sm font-bold" required={field.required} />
+                             <input name={`${field.label}_city`} placeholder="City" className="w-full bg-gray-50 rounded-2xl py-4 px-6 text-sm font-bold" required={field.required} />
+                             <input name={`${field.label}_house`} placeholder="House No." className="w-full bg-gray-50 rounded-2xl py-4 px-6 text-sm font-bold" required={field.required} />
+                           </div>
+                        ) : (
+                          <input 
+                            name={field.label}
+                            type={field.type} 
+                            required={field.required}
+                            placeholder={`Enter ${field.label.toLowerCase()}`}
+                            className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 font-bold text-sm focus:ring-2 focus:ring-brand-blue/10 outline-none"
+                          />
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1189,9 +1268,24 @@ export default function App() {
                                   {loan.fullName} <span className="text-[10px] bg-gray-100 px-2 rounded text-gray-500">{loan.loanType}</span>
                                 </h4>
                                 <p className="text-xs text-gray-400">{loan.phone} • {new Date(loan.timestamp).toLocaleString()}</p>
-                                <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1">
+                                <div className="mt-2 grid grid-cols-1 gap-y-2">
                                   {Object.entries(loan.customData || {}).map(([k, v]: [any, any]) => (
-                                    <p key={k} className="text-[10px] text-gray-500"><span className="font-bold capitalize">{k}:</span> {v}</p>
+                                    <div key={k} className="text-[10px] text-gray-500 border-l-2 border-gray-100 pl-2">
+                                      <span className="font-bold capitalize text-brand-blue block mb-1">{k}:</span>
+                                      {typeof v === 'object' ? (
+                                        <div className="grid grid-cols-2 gap-2 bg-gray-50 p-2 rounded-lg">
+                                          {Object.entries(v).map(([subK, subV]: [any, any]) => (
+                                            <p key={subK}><span className="capitalize opacity-60">{subK}:</span> {subV}</p>
+                                          ))}
+                                        </div>
+                                      ) : (typeof v === 'string' && v.startsWith('data:image')) ? (
+                                        <img src={v} className="w-full max-w-[200px] h-auto rounded-lg border border-gray-100 mt-1" alt={k} />
+                                      ) : (typeof v === 'string' && v.startsWith('data:')) ? (
+                                        <a href={v} download={k} className="text-brand-blue underline font-bold">Download Attachment</a>
+                                      ) : (
+                                        <p>{v}</p>
+                                      )}
+                                    </div>
                                   ))}
                                 </div>
                               </div>
@@ -1273,64 +1367,179 @@ export default function App() {
                       </div>
                     )}
                     {adminTab === 'products' && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                         {loanProducts.map((p: LoanProduct) => (
-                           <div key={p.id} className="app-card border-none shadow-sm ring-1 ring-gray-100 group">
-                             <div className="flex items-center justify-between mb-4">
-                               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl ${p.color}`}>
-                                  {p.iconType === 'emoji' ? p.icon : (p.iconType === 'url' ? <img src={p.icon} className="w-6 h-6 object-contain" /> : <Briefcase size={20} />)}
+                      <div className="space-y-8">
+                         {editingProduct ? (
+                           <div className="app-card space-y-6 slide-up">
+                             <div className="flex items-center justify-between">
+                                <h2 className="text-xl font-bold text-brand-blue">Edit Loan Form Builder</h2>
+                                <button onClick={() => setEditingProduct(null)} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"><X size={16} /></button>
+                             </div>
+                             
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                               <div className="space-y-4">
+                                 <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400">Loan Title</label>
+                                 <input 
+                                  className="w-full bg-gray-50 border-none rounded-xl p-4 font-bold text-sm" 
+                                  value={editingProduct.title}
+                                  onChange={(e) => setEditingProduct({...editingProduct, title: e.target.value})}
+                                 />
                                </div>
-                               <div className="flex gap-2">
-                                 <button 
+                               <div className="space-y-4">
+                                 <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400">Icon (Emoji/URL/Lucide Name)</label>
+                                 <input 
+                                  className="w-full bg-gray-50 border-none rounded-xl p-4 font-bold text-sm" 
+                                  value={editingProduct.icon}
+                                  onChange={(e) => setEditingProduct({...editingProduct, icon: e.target.value, iconType: e.target.value.includes('http') ? 'url' : (e.target.value.length > 2 ? 'lucide' : 'emoji')})}
+                                 />
+                               </div>
+                             </div>
+
+                             <div className="space-y-4">
+                               <div className="flex items-center justify-between">
+                                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400">Application Form Fields</label>
+                                  <button 
+                                    onClick={() => setEditingProduct({
+                                      ...editingProduct, 
+                                      formFields: [...editingProduct.formFields, { label: 'Field Name', type: 'text', required: true }]
+                                    })}
+                                    className="text-[10px] font-bold text-brand-blue bg-blue-50 px-3 py-1 rounded-lg border border-blue-100"
+                                  >+ Add New Field</button>
+                               </div>
+                               
+                               <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                                  {editingProduct.formFields.map((field, idx) => (
+                                    <div key={idx} className="flex flex-wrap gap-4 items-center bg-gray-50 p-4 rounded-2xl border border-gray-100 group">
+                                      <div className="flex-1 min-w-[150px]">
+                                        <input 
+                                          className="bg-white px-3 py-2 rounded-lg text-xs font-bold w-full border border-gray-100" 
+                                          value={field.label}
+                                          onChange={(e) => {
+                                            const newFields = [...editingProduct.formFields];
+                                            newFields[idx].label = e.target.value;
+                                            setEditingProduct({...editingProduct, formFields: newFields});
+                                          }}
+                                        />
+                                      </div>
+                                      <select 
+                                        className="bg-white px-3 py-2 rounded-lg text-xs font-bold border border-gray-100"
+                                        value={field.type}
+                                        onChange={(e) => {
+                                          const newFields = [...editingProduct.formFields];
+                                          newFields[idx].type = e.target.value as any;
+                                          setEditingProduct({...editingProduct, formFields: newFields});
+                                        }}
+                                      >
+                                        <option value="text">Text</option>
+                                        <option value="number">Number</option>
+                                        <option value="tel">Phone</option>
+                                        <option value="textarea">Long Text</option>
+                                        <option value="file">File Upload</option>
+                                        <option value="image">Image Only</option>
+                                        <option value="location">Location Info</option>
+                                        <option value="guarantors">Guarantors (Group)</option>
+                                      </select>
+                                      <label className="flex items-center gap-2 text-[10px] font-bold text-gray-400 select-none">
+                                        <input 
+                                          type="checkbox" 
+                                          checked={field.required}
+                                          onChange={(e) => {
+                                            const newFields = [...editingProduct.formFields];
+                                            newFields[idx].required = e.target.checked;
+                                            setEditingProduct({...editingProduct, formFields: newFields});
+                                          }}
+                                        /> Required
+                                      </label>
+                                      <button 
+                                        onClick={() => {
+                                          const newFields = editingProduct.formFields.filter((_, i) => i !== idx);
+                                          setEditingProduct({...editingProduct, formFields: newFields});
+                                        }}
+                                        className="p-1.5 text-gray-300 hover:text-rose-500 hover:bg-white rounded-lg transition-colors"
+                                      ><X size={14} /></button>
+                                    </div>
+                                  ))}
+                               </div>
+                             </div>
+
+                             <div className="flex gap-4">
+                                <button 
+                                  onClick={() => setEditingProduct(null)}
+                                  className="flex-1 bg-gray-100 text-gray-600 py-4 rounded-xl text-sm font-bold"
+                                >Cancel</button>
+                                <button 
                                   onClick={async () => {
-                                    const { doc, deleteDoc } = await import('firebase/firestore');
+                                    const { doc, updateDoc, collection, addDoc } = await import('firebase/firestore');
                                     const { db } = await import('./lib/firebase');
-                                    if(confirm('Delete product?')) await deleteDoc(doc(db, 'loanProducts', p.id!));
+                                    if (editingProduct.id) {
+                                      await updateDoc(doc(db, 'loanProducts', editingProduct.id), { ...editingProduct });
+                                    } else {
+                                      await addDoc(collection(db, 'loanProducts'), { ...editingProduct });
+                                    }
+                                    setEditingProduct(null);
+                                    alert('Loan product updated successfully!');
                                   }}
-                                  className="p-2 text-gray-300 hover:text-rose-500 transition-colors"
-                                 ><X size={18} /></button>
-                               </div>
-                             </div>
-                             <h4 className="font-bold text-brand-blue mb-1">{p.title}</h4>
-                             <p className="text-xs text-gray-500 mb-4 line-clamp-2">{p.description}</p>
-                             <div className="bg-gray-50 rounded-xl p-3">
-                               <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Form Fields ({p.formFields?.length || 0})</p>
-                               <div className="flex flex-wrap gap-2">
-                                 {p.formFields?.map((f, i) => (
-                                   <span key={i} className="text-[9px] bg-white border border-gray-200 px-2 py-1 rounded-lg text-gray-600 font-bold">{f.label}</span>
-                                 ))}
-                               </div>
+                                  className="flex-[2] btn-primary py-4 rounded-xl text-sm font-bold shadow-xl shadow-brand-blue/20"
+                                >Update Product</button>
                              </div>
                            </div>
-                         ))}
-                         
-                         <button 
-                          onClick={async () => {
-                            const title = prompt('Loan Title?');
-                            if (!title) return;
-                            const desc = prompt('Description?');
-                            const { collection, addDoc } = await import('firebase/firestore');
-                            const { db } = await import('./lib/firebase');
-                            await addDoc(collection(db, 'loanProducts'), {
-                              title,
-                              description: desc || '',
-                              icon: '💰',
-                              iconType: 'emoji',
-                              color: 'bg-indigo-50 text-indigo-600',
-                              formFields: [
-                                { label: 'Full Name', type: 'text', required: true },
-                                { label: 'Phone', type: 'tel', required: true },
-                                { label: 'Amount', type: 'number', required: true }
-                              ]
-                            });
-                          }}
-                          className="app-card border-dashed border-2 border-gray-200 flex flex-col items-center justify-center gap-4 text-gray-400 py-12 hover:border-brand-blue hover:text-brand-blue transition-all"
-                         >
-                           <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center group-hover:bg-brand-blue/5">
-                             <X size={24} className="rotate-45" />
+                         ) : (
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                             {loanProducts.map((p: LoanProduct) => (
+                               <div key={p.id} className="app-card border-none shadow-sm ring-1 ring-gray-100 group hover:ring-brand-blue/30 transition-all">
+                                 <div className="flex items-center justify-between mb-4">
+                                   <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl ${p.color}`}>
+                                      {p.iconType === 'emoji' ? p.icon : (p.iconType === 'url' ? <img src={p.icon} className="w-6 h-6 object-contain" /> : <Briefcase size={20} />)}
+                                   </div>
+                                   <div className="flex gap-2">
+                                     <button 
+                                      onClick={() => setEditingProduct(p)}
+                                      className="p-2 text-gray-300 hover:text-brand-blue transition-colors"
+                                      title="Edit Form"
+                                     ><PenTool size={18} /></button>
+                                     <button 
+                                      onClick={async () => {
+                                        const { doc, deleteDoc } = await import('firebase/firestore');
+                                        const { db } = await import('./lib/firebase');
+                                        if(confirm(`Delete ${p.title} loan?`)) await deleteDoc(doc(db, 'loanProducts', p.id!));
+                                      }}
+                                      className="p-2 text-gray-300 hover:text-rose-500 transition-colors"
+                                      title="Delete"
+                                     ><X size={18} /></button>
+                                   </div>
+                                 </div>
+                                 <h4 className="font-bold text-brand-blue mb-1">{p.title}</h4>
+                                 <div className="bg-gray-50 rounded-xl p-3">
+                                   <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Active Fields</p>
+                                   <div className="flex flex-wrap gap-2">
+                                     {p.formFields?.map((f, i) => (
+                                       <span key={i} className="text-[9px] bg-white border border-gray-200 px-2 py-1 rounded-lg text-gray-600 font-bold">{f.label}</span>
+                                     ))}
+                                   </div>
+                                 </div>
+                               </div>
+                             ))}
+                             
+                             <button 
+                              onClick={() => setEditingProduct({
+                                title: 'New Loan',
+                                description: 'Describe the loan purpose',
+                                icon: '💰',
+                                iconType: 'emoji',
+                                color: 'bg-indigo-50 text-indigo-600',
+                                formFields: [
+                                  { label: 'Full Name', type: 'text', required: true },
+                                  { label: 'Amount', type: 'number', required: true }
+                                ]
+                              })}
+                              className="app-card border-dashed border-2 border-gray-200 flex flex-col items-center justify-center gap-4 text-gray-400 py-12 hover:border-brand-blue hover:text-brand-blue group transition-all"
+                             >
+                               <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center group-hover:bg-brand-blue/5">
+                                 <Plus size={24} />
+                               </div>
+                               <span className="font-black text-[10px] uppercase tracking-[0.2em]">Add New Product</span>
+                             </button>
                            </div>
-                           <span className="font-black text-[10px] uppercase tracking-[0.2em]">Add New Loan Product</span>
-                         </button>
+                         )}
                       </div>
                     )}
                   </>
