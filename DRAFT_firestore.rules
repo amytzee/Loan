@@ -1,0 +1,20 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+    
+    match /applications/{applicationId} {
+      // Allow anyone to create an application (lead generation)
+      // In a production app, we'd want to restrict this or use a public submissions collection
+      allow create: if request.resource.data.fullName is string 
+                    && request.resource.data.phone is string
+                    && request.resource.data.amount is string;
+      
+      // Only admins or the submitter (if we had auth) could read
+      // For now, let's keep it simple for the demo
+      allow read: if true; 
+    }
+  }
+}
