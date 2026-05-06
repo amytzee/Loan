@@ -46,6 +46,7 @@ import { AuthView } from './components/AuthView';
 
 // --- Types ---
 type Language = 'sw' | 'en';
+const ADMIN_EMAILS = ['admin@gmail.com', 'amytzee@gmail.com'];
 
 interface Translation {
   nav: { home: string; services: string; about: string; process: string; apply: string };
@@ -377,7 +378,7 @@ const Navbar = ({ lang, setLang, activeView, setActiveView, user, appConfig, set
             <div className={`p-2 rounded-2xl ${activeView === 'history' ? 'bg-brand-blue text-white' : ''}`}>
               <History size={20} />
             </div>
-            <span className="text-[10px] font-bold mt-1">{user?.email === 'admin@gmail.com' ? 'Admin' : 'History'}</span>
+            <span className="text-[10px] font-bold mt-1">{ADMIN_EMAILS.includes(user?.email || '') ? 'Admin' : 'History'}</span>
           </button>
 
           <button 
@@ -883,7 +884,7 @@ export default function App() {
     }
 
     // Persist to Firebase if Admin
-    if (user?.email === 'admin@gmail.com') {
+    if (ADMIN_EMAILS.includes(user?.email || '')) {
       const saveConfig = async () => {
         const { doc, setDoc } = await import('firebase/firestore');
         const { db } = await import('./lib/firebase');
@@ -995,7 +996,7 @@ export default function App() {
           }
         );
 
-        if (user.email === 'admin@gmail.com') {
+        if (user && ADMIN_EMAILS.includes(user.email || '')) {
           // Admin fetches everything
           unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
             setAllUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -1040,7 +1041,7 @@ export default function App() {
       unsub = onSnapshot(query(collection(db, 'loanProducts')), async (snapshot) => {
         const products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
-        if (products.length === 0 && user?.email === 'admin@gmail.com') {
+        if (products.length === 0 && user && ADMIN_EMAILS.includes(user?.email || '')) {
           // Auto-seed for admin if empty
           const defaults = [
             { icon: 'User', title: 'Personal', color: 'bg-blue-50 text-blue-600' },
@@ -1231,7 +1232,7 @@ export default function App() {
                     </button>
                   );
                 })}
-                {user?.email === 'admin@gmail.com' && (
+                {user && ADMIN_EMAILS.includes(user?.email || '') && (
                   <button className="app-card border-dashed border-2 border-gray-200 flex flex-col items-center gap-4 justify-center text-gray-400 hover:border-brand-blue hover:text-brand-blue" onClick={() => setActiveView('history')}>
                     <History size={28} />
                     <span className="text-xs font-bold uppercase tracking-widest">Manage Items</span>
@@ -1443,10 +1444,10 @@ export default function App() {
             >
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
                 <div>
-                  <h1 className="text-2xl font-display font-bold text-brand-blue">{user?.email === 'admin@gmail.com' ? 'Admin Dashboard' : 'Application History'}</h1>
-                  <p className="text-sm text-gray-500">{user?.email === 'admin@gmail.com' ? 'Monitor all system activities' : 'Real-time update of your requests'}</p>
+                  <h1 className="text-2xl font-display font-bold text-brand-blue">{ADMIN_EMAILS.includes(user?.email || '') ? 'Admin Dashboard' : 'Application History'}</h1>
+                  <p className="text-sm text-gray-500">{ADMIN_EMAILS.includes(user?.email || '') ? 'Monitor all system activities' : 'Real-time update of your requests'}</p>
                 </div>
-                {user?.email === 'admin@gmail.com' && (
+                {user && ADMIN_EMAILS.includes(user?.email || '') && (
                   <div className="flex flex-col sm:flex-row gap-4">
                     <div className="relative">
                       <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -1476,7 +1477,7 @@ export default function App() {
                 )}
               </div>
 
-              {user?.email === 'admin@gmail.com' && adminTab !== 'settings' && adminTab !== 'notifs' && (
+              {user && ADMIN_EMAILS.includes(user?.email || '') && adminTab !== 'settings' && adminTab !== 'notifs' && (
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-8">
                   {[
                     { label: 'Total Apps', value: stats.total, color: 'text-brand-blue', bg: 'bg-blue-50', icon: <History size={16} /> },
@@ -1502,7 +1503,7 @@ export default function App() {
               )}
 
               <div className="space-y-6">
-                {user?.email === 'admin@gmail.com' ? (
+                {ADMIN_EMAILS.includes(user?.email || '') ? (
                   <>
                         {adminTab === 'notifs' && (
                           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 slide-up">
@@ -1659,10 +1660,14 @@ export default function App() {
                                 </div>
                                 <button 
                                   onClick={async () => {
-                                    const { doc, setDoc } = await import('firebase/firestore');
+                                    try {
+                                      const { doc, setDoc } = await import('firebase/firestore');
                                     const { db } = await import('./lib/firebase');
                                     await setDoc(doc(db, 'appConfig', 'main'), appConfig, { merge: true });
-                                    alert('Settings saved globally!');
+                                    alert(lang === 'sw' ? 'Mipangilio imehifadhiwa!' : 'Settings saved globally!');
+                                  } catch (error: any) {
+                                    alert(lang === 'sw' ? 'Hitilafu: ' + error.message : 'Error: ' + error.message);
+                                  }
                                   }}
                                   className="w-full btn-primary py-4 rounded-xl"
                                 >
@@ -2089,11 +2094,11 @@ export default function App() {
                   </div>
                   <h2 className="text-2xl font-display font-bold text-brand-blue">
                     {user.displayName || profileData?.fullName}
-                    {user.email === 'admin@gmail.com' && <span className="ml-2 text-[10px] bg-brand-gold text-brand-blue px-2 py-0.5 rounded-full">ADMIN</span>}
+                    {user && ADMIN_EMAILS.includes(user.email || '') && <span className="ml-2 text-[10px] bg-brand-gold text-brand-blue px-2 py-0.5 rounded-full">ADMIN</span>}
                   </h2>
                   <p className="text-gray-400">{user.email || profileData?.phone}</p>
                   
-                  {user.email === 'admin@gmail.com' && (
+                  {user && ADMIN_EMAILS.includes(user.email || '') && (
                     <div className="mt-6 bg-brand-blue text-white p-4 rounded-2xl text-left">
                        <p className="text-[10px] font-black uppercase tracking-widest opacity-50 mb-2">Admin Stats</p>
                        <div className="grid grid-cols-2 gap-4">
