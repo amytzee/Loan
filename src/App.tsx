@@ -1121,7 +1121,7 @@ export default function App() {
                   }
                 }}>
                   <div className="grid grid-cols-1 gap-6">
-                    {selectedProduct?.formFields.map((field, i) => (
+                    {(selectedProduct?.formFields || []).map((field, i) => (
                       <div key={i} className="space-y-4">
                         <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400">{field.label} {field.required && <span className="text-rose-500">*</span>}</label>
                         
@@ -1400,14 +1400,14 @@ export default function App() {
                                   <button 
                                     onClick={() => setEditingProduct({
                                       ...editingProduct, 
-                                      formFields: [...editingProduct.formFields, { label: 'Field Name', type: 'text', required: true }]
+                                      formFields: [...(editingProduct.formFields || []), { label: 'Field Name', type: 'text', required: true }]
                                     })}
                                     className="text-[10px] font-bold text-brand-blue bg-blue-50 px-3 py-1 rounded-lg border border-blue-100"
                                   >+ Add New Field</button>
                                </div>
                                
                                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                                  {editingProduct.formFields.map((field, idx) => (
+                                  {(editingProduct.formFields || []).map((field, idx) => (
                                     <div key={idx} className="flex flex-wrap gap-4 items-center bg-gray-50 p-4 rounded-2xl border border-gray-100 group">
                                       <div className="flex-1 min-w-[150px]">
                                         <input 
