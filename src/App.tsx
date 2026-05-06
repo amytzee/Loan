@@ -853,38 +853,72 @@ export default function App() {
   const [adminTab, setAdminTab] = useState<'loans' | 'users' | 'products'>('loans');
 
   useEffect(() => {
-    const fetchProducts = async () => {
-      const { collection, onSnapshot, query } = await import('firebase/firestore');
+    let unsubUsers: (() => void) | undefined;
+    let unsubApps: (() => void) | undefined;
+
+    const initDataFetching = async () => {
+      const { collection, onSnapshot, query, orderBy, where } = await import('firebase/firestore');
       const { db } = await import('./lib/firebase');
-      return onSnapshot(query(collection(db, 'loanProducts')), (snapshot) => {
+
+      if (user?.email === 'admin@gmail.com') {
+        // Admin fetches everything
+        unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
+          setAllUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        });
+
+        unsubApps = onSnapshot(query(collection(db, 'applications'), orderBy('timestamp', 'desc')), (snapshot) => {
+          setApplications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        });
+      } else if (user) {
+        // Normal user fetches only their applications
+        unsubApps = onSnapshot(
+          query(collection(db, 'applications'), where('userId', '==', user.uid), orderBy('timestamp', 'desc')), 
+          (snapshot) => {
+            setApplications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          }
+        );
+      } else {
+        setApplications([]);
+        setAllUsers([]);
+      }
+    };
+
+    initDataFetching();
+    return () => {
+      unsubUsers?.();
+      unsubApps?.();
+    };
+  }, [user]);
+
+  useEffect(() => {
+    let unsub: (() => void) | undefined;
+
+    const fetchProducts = async () => {
+      const { collection, onSnapshot, query, addDoc, getDocs } = await import('firebase/firestore');
+      const { db } = await import('./lib/firebase');
+      
+      unsub = onSnapshot(query(collection(db, 'loanProducts')), async (snapshot) => {
         const products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        if (products.length === 0) {
-          // Initialize with defaults if empty
+        
+        if (products.length === 0 && user?.email === 'admin@gmail.com') {
+          // Auto-seed for admin if empty
           const defaults = [
             { icon: 'User', title: 'Personal', color: 'bg-blue-50 text-blue-600' },
             { icon: 'Home', title: 'House', color: 'bg-emerald-50 text-emerald-600' },
             { icon: 'Briefcase', title: 'Business', color: 'bg-amber-50 text-amber-600' },
-            { icon: 'GraduationCap', title: 'Education', color: 'bg-purple-50 text-purple-600' },
+            { icon: 'Clock', title: 'Emergency', color: 'bg-rose-50 text-rose-600' },
           ];
-          setLoanProducts(defaults);
+          for (const d of defaults) {
+            await addDoc(collection(db, 'loanProducts'), d);
+          }
         } else {
           setLoanProducts(products);
         }
       });
     };
-    fetchProducts();
-  }, []);
 
-  useEffect(() => {
-    const fetchAllUsers = async () => {
-      if (user?.email !== 'admin@gmail.com') return;
-      const { collection, onSnapshot } = await import('firebase/firestore');
-      const { db } = await import('./lib/firebase');
-      return onSnapshot(collection(db, 'users'), (snapshot) => {
-        setAllUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      });
-    };
-    fetchAllUsers();
+    fetchProducts();
+    return () => unsub?.();
   }, [user]);
 
   useEffect(() => {
@@ -908,31 +942,6 @@ export default function App() {
     };
     initAuth();
   }, []);
-
-  useEffect(() => {
-    const fetchApps = async () => {
-      const { collection, query, orderBy, onSnapshot, where } = await import('firebase/firestore');
-      const { db } = await import('./lib/firebase');
-      
-      let q;
-      if (user?.email === 'admin@gmail.com') {
-        q = query(collection(db, 'applications'), orderBy('timestamp', 'desc'));
-      } else if (user) {
-        q = query(collection(db, 'applications'), where('userId', '==', user.uid), orderBy('timestamp', 'desc'));
-      } else {
-        setApplications([]);
-        return;
-      }
-
-      return onSnapshot(q, (snapshot) => {
-        const apps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setApplications(apps);
-      });
-    };
-    if (activeView === 'history') {
-      fetchApps();
-    }
-  }, [activeView, user]);
 
   const handleLogin = async () => {
     try {
