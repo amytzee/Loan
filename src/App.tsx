@@ -412,15 +412,15 @@ const Navbar = ({ lang, setLang, activeView, setActiveView, user, appConfig, set
 const Hero = ({ lang, users, appConfig }: { lang: Language, users: any[], appConfig: AppConfig }) => {
   const t = translations[lang].hero;
   
-  // High quality themed images matching the user's request
+  // Themed images inspired by user posters
   const heroImages = [
     {
-      url: "https://images.unsplash.com/photo-1554469384-e58fac16e23a?auto=format&fit=crop&q=80&w=1200",
-      caption: lang === 'sw' ? 'Smile kwa mkopo nafuu na wa haraka!' : 'Smile with affordable and fast loans!'
+      url: "https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&q=80&w=1200", 
+      caption: lang === 'sw' ? 'Stress za kodi? Sasa Basi!' : 'No more rent stress!'
     },
     {
-      url: "https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&q=80&w=1200",
-      caption: lang === 'sw' ? 'Mkopo wa kodi - Stress za kodi sasa basi!' : 'Rental Loans - No more rent stress!'
+      url: "https://images.unsplash.com/photo-1556740758-90de374c12ad?auto=format&fit=crop&q=80&w=1200",
+      caption: lang === 'sw' ? 'Smile kwa mkopo nafuu na wa haraka!' : 'Smile with fast and affordable loans!'
     }
   ];
 
@@ -429,12 +429,12 @@ const Hero = ({ lang, users, appConfig }: { lang: Language, users: any[], appCon
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentImage((prev) => (prev + 1) % heroImages.length);
-    }, 5000);
+    }, 6000);
     return () => clearInterval(timer);
   }, []);
 
   return (
-    <section id="home" className="relative min-h-screen flex items-center pt-20 md:pt-24 pb-12 md:pb-24 overflow-hidden bg-brand-dark">
+    <section id="home" className="relative min-h-screen flex items-center pt-24 pb-16 md:pb-24 overflow-hidden bg-brand-dark">
       {/* Background Blurs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] right-[-10%] w-[300px] md:w-[600px] h-[300px] md:h-[600px] bg-brand-blue/30 rounded-full blur-[80px] md:blur-[120px]" />
@@ -447,28 +447,28 @@ const Hero = ({ lang, users, appConfig }: { lang: Language, users: any[], appCon
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.8 }}
-          className="order-2 lg:order-1"
+          className="order-2 lg:order-1 text-center lg:text-left"
         >
           <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-full mb-8 backdrop-blur-md">
             <span className="w-2 h-2 bg-brand-gold rounded-full animate-pulse shadow-[0_0_10px_rgba(255,215,0,0.5)]" />
             <span className="text-[10px] md:text-xs font-black text-brand-gold uppercase tracking-[0.2em]">{t.badge}</span>
           </div>
           
-          <h1 className="text-4xl sm:text-6xl md:text-7xl xl:text-8xl font-display font-bold text-white leading-[1.1] md:leading-[1] mb-6 md:mb-8">
+          <h1 className="text-4xl sm:text-6xl md:text-7xl xl:text-8xl font-display font-bold text-white leading-[1.1] md:leading-[1] mb-6 md:mb-8 text-balance">
             {appConfig.name} <br /> 
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-gold via-yellow-200 to-brand-gold drop-shadow-sm">{t.smile}</span>
           </h1>
           
-          <p className="text-base md:text-xl xl:text-2xl text-slate-300 mb-10 max-w-lg leading-relaxed font-medium">
+          <p className="text-base md:text-xl xl:text-2xl text-slate-300 mb-10 max-w-lg mx-auto lg:mx-0 leading-relaxed font-medium">
             {t.desc}
           </p>
 
-          <div className="flex flex-col sm:flex-row flex-wrap gap-4 md:gap-6">
-            <a href="#services" className="group bg-brand-gold text-brand-blue px-10 py-5 rounded-2xl font-black text-lg flex items-center justify-center gap-3 hover:bg-white transition-all shadow-2xl shadow-brand-gold/30">
+          <div className="flex flex-col sm:flex-row flex-wrap gap-4 md:gap-6 justify-center lg:justify-start">
+            <a href="#apply" className="group bg-brand-gold text-brand-blue px-10 py-5 rounded-2xl font-black text-lg flex items-center justify-center gap-3 hover:bg-white transition-all shadow-2xl shadow-brand-gold/30">
               {t.cta} <ArrowRight size={22} className="group-hover:translate-x-1 transition-transform" />
             </a>
             {users.length > 0 && (
-              <div className="flex items-center gap-4 py-2">
+              <div className="flex items-center gap-4 py-2 justify-center">
                 <div className="flex -space-x-3 md:-space-x-4">
                   {users.slice(0, 3).map((u, i) => (
                     <div key={u.id || i} className="w-10 h-10 md:w-12 md:h-12 rounded-full border-2 border-brand-dark bg-slate-800 flex items-center justify-center overflow-hidden hover:scale-110 hover:z-10 transition-all shadow-xl">
@@ -476,7 +476,7 @@ const Hero = ({ lang, users, appConfig }: { lang: Language, users: any[], appCon
                     </div>
                   ))}
                 </div>
-                <div>
+                <div className="text-left">
                   <p className="text-white font-black text-xs md:text-sm tracking-tight">{t.stats}</p>
                   <div className="flex gap-0.5 text-brand-gold">
                     {[1, 2, 3, 4, 5].map((s) => <Star key={s} size={10} fill="currentColor" />)}
@@ -493,51 +493,61 @@ const Hero = ({ lang, users, appConfig }: { lang: Language, users: any[], appCon
           viewport={{ once: true }}
           className="order-1 lg:order-2 relative"
         >
-          <div className="relative aspect-[4/5] sm:aspect-square lg:aspect-[4/5] xl:aspect-square w-full max-w-[500px] mx-auto group">
-            {/* Main Image Container */}
-            <div className="absolute inset-0 rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden border-2 border-white/10 shadow-2xl">
+          <div className="relative aspect-[3/4] sm:aspect-square lg:aspect-[4/5] xl:aspect-square w-full max-w-[480px] mx-auto group">
+            <div className="absolute inset-0 rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden border-2 border-white/10 shadow-[0_32px_64px_-15px_rgba(0,0,0,0.5)]">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={currentImage}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.5 }}
+                  initial={{ opacity: 0, scale: 1.1 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.8 }}
                   className="absolute inset-0"
                 >
                   <img 
                     src={heroImages[currentImage].url} 
                     alt={heroImages[currentImage].caption}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    className="w-full h-full object-cover transition-transform duration-[12s] group-hover:scale-110 ease-linear"
                     referrerPolicy="no-referrer"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-brand-blue/80 via-transparent to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-brand-blue/90 via-black/10 to-transparent" />
                   
-                  {/* Floating Caption inside the image */}
-                  <div className="absolute bottom-8 left-8 right-8">
-                    <p className="text-white font-bold text-lg md:text-xl drop-shadow-lg">{heroImages[currentImage].caption}</p>
+                  <div className="absolute bottom-8 left-6 right-6 md:bottom-12 md:left-10 md:right-10">
+                    <motion.p 
+                      initial={{ y: 20, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      transition={{ delay: 0.3 }}
+                      className="text-white font-display font-bold text-2xl md:text-3xl lg:text-4xl leading-tight drop-shadow-xl"
+                    >
+                      {heroImages[currentImage].caption}
+                    </motion.p>
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: "40px" }}
+                      className="h-1 bg-brand-gold mt-4 rounded-full"
+                    />
                   </div>
                 </motion.div>
               </AnimatePresence>
             </div>
 
-            {/* Floating Decorative Elements */}
+            {/* Floating Badges */}
             <motion.div 
-              animate={{ y: [0, -12, 0] }}
+              animate={{ y: [0, -10, 0] }}
               transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute -top-4 -right-4 sm:-top-8 sm:-right-8 glass p-4 md:p-6 rounded-3xl shadow-2xl backdrop-blur-xl border border-white/20 z-20"
+              className="absolute -top-4 -right-2 sm:-top-8 sm:-right-4 glass p-4 md:p-6 rounded-3xl shadow-2xl backdrop-blur-xl border border-white/20 z-20"
             >
               <div className="bg-brand-gold w-10 md:w-12 h-10 md:h-12 rounded-2xl flex items-center justify-center mb-3 shadow-lg">
                 <HandCoins className="text-brand-blue w-5 md:w-6 h-5 md:h-6" />
               </div>
-              <p className="text-white font-black text-lg md:text-xl tracking-tight">24-Hr Fund</p>
-              <p className="text-brand-gold text-[10px] font-black uppercase tracking-widest">{t.fast}</p>
+              <p className="text-white font-black text-lg md:text-xl tracking-tight leading-none mb-1">24 Hour</p>
+              <p className="text-brand-gold text-[10px] font-black uppercase tracking-widest leading-none">{t.fast}</p>
             </motion.div>
 
             <motion.div 
-              animate={{ y: [0, 12, 0] }}
+              animate={{ y: [0, 10, 0] }}
               transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute -bottom-6 -left-6 glass p-4 md:p-5 rounded-[2rem] shadow-2xl backdrop-blur-xl border border-white/20 z-20 hidden sm:block"
+              className="absolute -bottom-6 -left-4 sm:-bottom-8 sm:-left-8 glass p-4 md:p-5 rounded-[2rem] shadow-2xl backdrop-blur-xl border border-white/20 z-20 hidden md:block"
             >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
@@ -545,7 +555,7 @@ const Hero = ({ lang, users, appConfig }: { lang: Language, users: any[], appCon
                 </div>
                 <div>
                   <p className="text-white font-bold text-sm">Verified Agent</p>
-                  <p className="text-slate-400 text-[10px] font-medium tracking-wide italic">Tier 2 Licensed</p>
+                  <p className="text-slate-400 text-[10px] font-medium tracking-wide italic leading-none">Tier 2 Licensed</p>
                 </div>
               </div>
             </motion.div>
