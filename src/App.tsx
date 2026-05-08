@@ -7,6 +7,8 @@ import {
   Briefcase, 
   Clock, 
   CheckCircle2, 
+  Star,
+  CheckCircle,
   Phone, 
   Instagram, 
   MapPin, 
@@ -113,6 +115,8 @@ interface AppConfig {
   helpPhone?: string;
   helpEmail?: string;
   helpWhatsapp?: string;
+  aiEnabled?: boolean;
+  geminiApiKey?: string;
 }
 
 interface LoanFormField {
@@ -126,6 +130,7 @@ interface Notification {
   userId: string; // 'all' for broadcast
   title: string;
   message: string;
+  imageUrl?: string;
   timestamp: string;
   read: boolean;
   type: 'status' | 'broadcast' | 'alert';
@@ -290,7 +295,7 @@ const translations: Record<Language, Translation> = {
 };
 
 // --- Navbar Component ---
-const Navbar = ({ lang, setLang, activeView, setActiveView, user, appConfig, setAppConfig, setShowingSupport }: { lang: Language, setLang: (l: Language) => void, activeView: string, setActiveView: (v: string) => void, user: any, appConfig: AppConfig, setAppConfig: (c: AppConfig) => void, setShowingSupport: (s: boolean) => void }) => {
+const Navbar = ({ lang, setLang, activeView, setActiveView, user, appConfig, setAppConfig, setShowingSupport, unreadCount, setShowNotifCenter }: { lang: Language, setLang: (l: Language) => void, activeView: string, setActiveView: (v: string) => void, user: any, appConfig: AppConfig, setAppConfig: (c: AppConfig) => void, setShowingSupport: (s: boolean) => void, unreadCount: number, setShowNotifCenter: (n: boolean) => void }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const t = translations[lang].nav;
@@ -351,6 +356,18 @@ const Navbar = ({ lang, setLang, activeView, setActiveView, user, appConfig, set
                 {appConfig.themeMode === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
               </button>
 
+              <button 
+                onClick={() => setShowNotifCenter(true)}
+                className={`p-2 rounded-xl border relative transition-all ${scrolled ? 'border-brand-blue/10 text-brand-blue hover:bg-brand-blue/5' : 'border-white/20 text-white hover:bg-white/10'}`}
+              >
+                <Bell size={14} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-brand-gold text-brand-blue text-[8px] font-black flex items-center justify-center rounded-full border-2 border-white dark:border-slate-900">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+
               <a href="#apply" className="btn-primary py-3 px-6 shadow-brand-blue/30">
                 {t.apply}
               </a>
@@ -371,8 +388,16 @@ const Navbar = ({ lang, setLang, activeView, setActiveView, user, appConfig, set
                 {appConfig.themeMode === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
               </button>
 
-              <button className={`p-1.5 rounded-xl ${scrolled ? 'text-brand-blue dark:text-brand-gold bg-brand-blue/5 dark:bg-white/5' : 'text-white bg-white/10'}`}>
+              <button 
+                onClick={() => setShowNotifCenter(true)}
+                className={`p-1.5 rounded-xl relative ${scrolled ? 'text-brand-blue dark:text-brand-gold bg-brand-blue/5 dark:bg-white/5' : 'text-white bg-white/10'}`}
+              >
                 <Bell size={16} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-brand-gold text-brand-blue text-[8px] font-black flex items-center justify-center rounded-full border-2 border-white dark:border-slate-900 animate-pulse">
+                    {unreadCount}
+                  </span>
+                )}
               </button>
             </div>
           </div>
@@ -386,49 +411,75 @@ const Navbar = ({ lang, setLang, activeView, setActiveView, user, appConfig, set
 // --- Hero Component ---
 const Hero = ({ lang, users, appConfig }: { lang: Language, users: any[], appConfig: AppConfig }) => {
   const t = translations[lang].hero;
+  
+  // High quality themed images matching the user's request
+  const heroImages = [
+    {
+      url: "https://images.unsplash.com/photo-1554469384-e58fac16e23a?auto=format&fit=crop&q=80&w=1200",
+      caption: lang === 'sw' ? 'Smile kwa mkopo nafuu na wa haraka!' : 'Smile with affordable and fast loans!'
+    },
+    {
+      url: "https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&q=80&w=1200",
+      caption: lang === 'sw' ? 'Mkopo wa kodi - Stress za kodi sasa basi!' : 'Rental Loans - No more rent stress!'
+    }
+  ];
+
+  const [currentImage, setCurrentImage] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentImage((prev) => (prev + 1) % heroImages.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, []);
+
   return (
-    <section id="home" className="relative min-h-[90vh] md:min-h-[95vh] flex items-center pt-24 pb-12 md:pb-24 overflow-hidden bg-brand-dark">
+    <section id="home" className="relative min-h-screen flex items-center pt-20 md:pt-24 pb-12 md:pb-24 overflow-hidden bg-brand-dark">
+      {/* Background Blurs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] right-[-10%] w-[300px] md:w-[600px] h-[300px] md:h-[600px] bg-brand-blue/40 rounded-full blur-[80px] md:blur-[120px]" />
-        <div className="absolute bottom-[-10%] left-[-10%] w-[200px] md:w-[400px] h-[200px] md:h-[400px] bg-brand-gold/20 rounded-full blur-[60px] md:blur-[100px]" />
+        <div className="absolute top-[-10%] right-[-10%] w-[300px] md:w-[600px] h-[300px] md:h-[600px] bg-brand-blue/30 rounded-full blur-[80px] md:blur-[120px]" />
+        <div className="absolute bottom-[-10%] left-[-10%] w-[200px] md:w-[400px] h-[200px] md:h-[400px] bg-brand-gold/10 rounded-full blur-[60px] md:blur-[100px]" />
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-6 grid lg:grid-cols-2 gap-12 md:gap-16 items-center">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-6 grid lg:grid-cols-2 gap-12 xl:gap-20 items-center">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.8 }}
+          className="order-2 lg:order-1"
         >
-          <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 px-3 md:px-4 py-1.5 md:py-2 rounded-full mb-6 md:mb-8 backdrop-blur-sm">
-            <span className="w-1.5 h-1.5 md:w-2 md:h-2 bg-brand-gold rounded-full animate-pulse" />
-            <span className="text-[10px] md:text-xs font-bold text-brand-gold uppercase tracking-[0.15em] md:tracking-[0.2em]">{t.badge}</span>
+          <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-full mb-8 backdrop-blur-md">
+            <span className="w-2 h-2 bg-brand-gold rounded-full animate-pulse shadow-[0_0_10px_rgba(255,215,0,0.5)]" />
+            <span className="text-[10px] md:text-xs font-black text-brand-gold uppercase tracking-[0.2em]">{t.badge}</span>
           </div>
           
-          <h1 className="text-4xl sm:text-6xl md:text-8xl font-display font-bold text-white leading-[1.1] md:leading-[0.95] mb-6 md:mb-8">
+          <h1 className="text-4xl sm:text-6xl md:text-7xl xl:text-8xl font-display font-bold text-white leading-[1.1] md:leading-[1] mb-6 md:mb-8">
             {appConfig.name} <br /> 
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-gold via-yellow-200 to-brand-gold">{t.smile}</span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-gold via-yellow-200 to-brand-gold drop-shadow-sm">{t.smile}</span>
           </h1>
           
-          <p className="text-base md:text-xl xl:text-2xl text-slate-300 mb-8 md:mb-10 max-w-lg leading-relaxed font-medium">
+          <p className="text-base md:text-xl xl:text-2xl text-slate-300 mb-10 max-w-lg leading-relaxed font-medium">
             {t.desc}
           </p>
 
-          <div className="flex flex-col sm:flex-row flex-wrap gap-4 md:gap-5">
-            <a href="#services" className="group bg-brand-gold text-brand-blue px-8 md:px-10 py-4 md:py-5 rounded-2xl font-black text-base md:text-lg flex items-center justify-center gap-3 hover:bg-white transition-all shadow-2xl shadow-brand-gold/20">
+          <div className="flex flex-col sm:flex-row flex-wrap gap-4 md:gap-6">
+            <a href="#services" className="group bg-brand-gold text-brand-blue px-10 py-5 rounded-2xl font-black text-lg flex items-center justify-center gap-3 hover:bg-white transition-all shadow-2xl shadow-brand-gold/30">
               {t.cta} <ArrowRight size={22} className="group-hover:translate-x-1 transition-transform" />
             </a>
             {users.length > 0 && (
-              <div className="flex -space-x-4 items-center justify-center sm:justify-start">
-                {users.map((u, i) => (
-                  <div key={u.id || i} className="w-10 h-10 md:w-14 md:h-14 rounded-full border-4 border-brand-dark bg-slate-800 flex items-center justify-center overflow-hidden hover:scale-110 hover:z-10 transition-all cursor-pointer">
-                    <img src={u.photoURL || `https://i.pravatar.cc/100?u=${u.id}`} alt="user" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                  </div>
-                ))}
-                <div className="pl-8">
+              <div className="flex items-center gap-4 py-2">
+                <div className="flex -space-x-3 md:-space-x-4">
+                  {users.slice(0, 3).map((u, i) => (
+                    <div key={u.id || i} className="w-10 h-10 md:w-12 md:h-12 rounded-full border-2 border-brand-dark bg-slate-800 flex items-center justify-center overflow-hidden hover:scale-110 hover:z-10 transition-all shadow-xl">
+                      <img src={u.photoURL || `https://i.pravatar.cc/100?u=${u.id}`} alt="user" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    </div>
+                  ))}
+                </div>
+                <div>
                   <p className="text-white font-black text-xs md:text-sm tracking-tight">{t.stats}</p>
-                  <div className="flex gap-1 text-brand-gold">
-                    {[1, 2, 3, 4, 5].map((s) => <span key={s} className="text-[10px] md:text-xs">★</span>)}
+                  <div className="flex gap-0.5 text-brand-gold">
+                    {[1, 2, 3, 4, 5].map((s) => <Star key={s} size={10} fill="currentColor" />)}
                   </div>
                 </div>
               </div>
@@ -437,32 +488,68 @@ const Hero = ({ lang, users, appConfig }: { lang: Language, users: any[], appCon
         </motion.div>
 
         <motion.div 
-          initial={{ opacity: 0, scale: 0.9 }}
+          initial={{ opacity: 0, scale: 0.95 }}
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
-          className="relative hidden lg:block"
+          className="order-1 lg:order-2 relative"
         >
-          <div className="relative z-10 rounded-[3rem] overflow-hidden shadow-2xl border-8 border-white/5 aspect-square">
-            <img 
-              src="https://images.unsplash.com/photo-1573164067005-446df1668c18?auto=format&fit=crop&q=80&w=1200" 
-              alt="Successful entrepreneur"
-              className="w-full h-full object-cover"
-              referrerPolicy="no-referrer"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-brand-blue/60 to-transparent" />
-          </div>
-          
-          <motion.div 
-            animate={{ y: [0, -15, 0] }}
-            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute -top-6 -left-6 glass p-5 rounded-3xl shadow-2xl"
-          >
-            <div className="bg-brand-gold w-10 h-10 rounded-2xl flex items-center justify-center mb-3">
-              <HandCoins className="text-brand-blue w-5 h-5" />
+          <div className="relative aspect-[4/5] sm:aspect-square lg:aspect-[4/5] xl:aspect-square w-full max-w-[500px] mx-auto group">
+            {/* Main Image Container */}
+            <div className="absolute inset-0 rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden border-2 border-white/10 shadow-2xl">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={currentImage}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.5 }}
+                  className="absolute inset-0"
+                >
+                  <img 
+                    src={heroImages[currentImage].url} 
+                    alt={heroImages[currentImage].caption}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-brand-blue/80 via-transparent to-transparent" />
+                  
+                  {/* Floating Caption inside the image */}
+                  <div className="absolute bottom-8 left-8 right-8">
+                    <p className="text-white font-bold text-lg md:text-xl drop-shadow-lg">{heroImages[currentImage].caption}</p>
+                  </div>
+                </motion.div>
+              </AnimatePresence>
             </div>
-            <p className="text-white font-bold text-xl">24 Hours</p>
-            <p className="text-slate-400 text-[10px] font-semibold uppercase">{t.fast}</p>
-          </motion.div>
+
+            {/* Floating Decorative Elements */}
+            <motion.div 
+              animate={{ y: [0, -12, 0] }}
+              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute -top-4 -right-4 sm:-top-8 sm:-right-8 glass p-4 md:p-6 rounded-3xl shadow-2xl backdrop-blur-xl border border-white/20 z-20"
+            >
+              <div className="bg-brand-gold w-10 md:w-12 h-10 md:h-12 rounded-2xl flex items-center justify-center mb-3 shadow-lg">
+                <HandCoins className="text-brand-blue w-5 md:w-6 h-5 md:h-6" />
+              </div>
+              <p className="text-white font-black text-lg md:text-xl tracking-tight">24-Hr Fund</p>
+              <p className="text-brand-gold text-[10px] font-black uppercase tracking-widest">{t.fast}</p>
+            </motion.div>
+
+            <motion.div 
+              animate={{ y: [0, 12, 0] }}
+              transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute -bottom-6 -left-6 glass p-4 md:p-5 rounded-[2rem] shadow-2xl backdrop-blur-xl border border-white/20 z-20 hidden sm:block"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                  <CheckCircle size={20} className="text-green-400" />
+                </div>
+                <div>
+                  <p className="text-white font-bold text-sm">Verified Agent</p>
+                  <p className="text-slate-400 text-[10px] font-medium tracking-wide italic">Tier 2 Licensed</p>
+                </div>
+              </div>
+            </motion.div>
+          </div>
         </motion.div>
       </div>
     </section>
@@ -909,7 +996,9 @@ export default function App() {
     themeMode: 'system',
     helpPhone: '+255 700 000 000',
     helpEmail: 'support@coshve.co.tz',
-    helpWhatsapp: '+255 700 000 000'
+    helpWhatsapp: '+255 700 000 000',
+    aiEnabled: true,
+    geminiApiKey: ''
   });
   const [calcAmount, setCalcAmount] = useState<number>(0);
   const [showAiAssistant, setShowAiAssistant] = useState(false);
@@ -925,7 +1014,7 @@ export default function App() {
   const [showNotifCenter, setShowNotifCenter] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<LoanProduct | null>(null);
   const [editingProduct, setEditingProduct] = useState<LoanProduct | null>(null);
-  const [broadcastMessage, setBroadcastMessage] = useState({ title: '', message: '', userId: 'all' });
+  const [broadcastMessage, setBroadcastMessage] = useState({ title: '', message: '', imageUrl: '', userId: 'all' });
 
   useEffect(() => {
     // Apply Branding
@@ -985,7 +1074,11 @@ export default function App() {
     try {
       const statsContext = `The user has ${applications.length} loan applications. ${applications.length > 0 ? `Current latest loan status: ${applications[0].status} for a ${applications[0].loanType} loan of ${applications[0].amount}.` : 'They have not applied for any loans yet.'}`;
 
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      if (!appConfig.aiEnabled) {
+        alert(lang === 'sw' ? 'AI Imezimwa. Tafadhali washa kwenye mipangilio.' : 'AI is disabled. Please enable it in settings.');
+        return;
+      }
+      const ai = new GoogleGenAI({ apiKey: appConfig.geminiApiKey || process.env.GEMINI_API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: newHistory,
@@ -1194,6 +1287,8 @@ export default function App() {
         appConfig={appConfig}
         setAppConfig={setAppConfig}
         setShowingSupport={setShowingSupport}
+        unreadCount={unreadCount}
+        setShowNotifCenter={setShowNotifCenter}
       />
 
       {/* Notification Center Popover */}
@@ -1209,7 +1304,7 @@ export default function App() {
             >
               <div className="p-6 border-b border-gray-50 flex items-center justify-between bg-brand-blue text-white">
                 <h3 className="font-bold flex items-center gap-2"><Bell size={18} /> Notifications</h3>
-                <span className="text-[10px] bg-white/20 px-2 py-1 rounded-lg uppercase font-black">{notifications.length} New</span>
+                <span className="text-[10px] bg-white/20 px-2 py-1 rounded-lg uppercase font-black">{unreadCount} New</span>
               </div>
               <div className="max-h-[60vh] overflow-y-auto custom-scrollbar">
                 {notifications.length === 0 ? (
@@ -1234,6 +1329,11 @@ export default function App() {
                           <span className="text-[8px] text-gray-400 font-bold uppercase">{new Date(n.timestamp).toLocaleDateString()}</span>
                        </div>
                        <p className="text-xs text-gray-500 leading-relaxed pl-2">{n.message}</p>
+                       {n.imageUrl && (
+                         <div className="mt-3 pl-2">
+                           <img src={n.imageUrl} className="w-full h-40 object-cover rounded-2xl shadow-sm hover:scale-[1.02] transition-transform duration-300" />
+                         </div>
+                       )}
                        {!n.read && <span className="absolute right-4 bottom-2 text-[8px] font-black uppercase text-brand-blue opacity-0 group-hover:opacity-100 transition-opacity">Click to read</span>}
                     </div>
                   ))
@@ -1619,6 +1719,46 @@ export default function App() {
                                           onChange={(e) => setBroadcastMessage({ ...broadcastMessage, message: e.target.value })}
                                         />
                                       </div>
+                                      <div>
+                                        <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Image Attachment (Optional)</label>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                          <input 
+                                            placeholder="https://example.com/image.jpg" 
+                                            className="w-full bg-gray-50 rounded-xl p-4 font-bold text-sm"
+                                            value={broadcastMessage.imageUrl}
+                                            onChange={(e) => setBroadcastMessage({ ...broadcastMessage, imageUrl: e.target.value })}
+                                          />
+                                          <div className="relative">
+                                            <input 
+                                              type="file" 
+                                              accept="image/*"
+                                              className="absolute inset-0 opacity-0 cursor-pointer"
+                                              onChange={async (e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file) {
+                                                  const reader = new FileReader();
+                                                  reader.onloadend = () => {
+                                                    setBroadcastMessage({ ...broadcastMessage, imageUrl: reader.result as string });
+                                                  };
+                                                  reader.readAsDataURL(file);
+                                                }
+                                              }}
+                                            />
+                                            <div className="w-full bg-gray-50 rounded-xl p-4 font-bold text-sm text-center border-2 border-dashed border-gray-200 text-gray-400">
+                                              Upload Photo
+                                            </div>
+                                          </div>
+                                        </div>
+                                        {broadcastMessage.imageUrl && (
+                                          <div className="mt-2 relative">
+                                            <img src={broadcastMessage.imageUrl} className="w-full h-32 object-cover rounded-xl border border-gray-100" />
+                                            <button 
+                                              onClick={() => setBroadcastMessage({ ...broadcastMessage, imageUrl: '' })}
+                                              className="absolute top-2 right-2 p-1 bg-white/80 rounded-full text-rose-500 hover:bg-white"
+                                            ><X size={14} /></button>
+                                          </div>
+                                        )}
+                                      </div>
                                       <button 
                                         onClick={async () => {
                                           if (!broadcastMessage.title || !broadcastMessage.message) return alert('Fill all fields');
@@ -1630,7 +1770,7 @@ export default function App() {
                                             read: false,
                                             type: broadcastMessage.userId === 'all' ? 'broadcast' : 'status'
                                           });
-                                          setBroadcastMessage({ title: '', message: '', userId: 'all' });
+                                          setBroadcastMessage({ title: '', message: '', imageUrl: '', userId: 'all' });
                                           alert('Notification sent!');
                                         }}
                                         className="w-full btn-primary py-4 rounded-xl shadow-xl shadow-brand-blue/20"
@@ -1646,9 +1786,12 @@ export default function App() {
                                    <div className="space-y-3">
                                       {notifications.filter(n => n.type === 'broadcast').slice(0, 5).map(n => (
                                         <div key={n.id} className="app-card flex justify-between items-center group">
-                                           <div>
-                                              <p className="font-bold text-brand-blue text-sm">{n.title}</p>
-                                              <p className="text-xs text-gray-400 line-clamp-1">{n.message}</p>
+                                           <div className="flex items-center gap-3">
+                                              {n.imageUrl && <img src={n.imageUrl} className="w-10 h-10 rounded-lg object-cover" />}
+                                              <div>
+                                                 <p className="font-bold text-brand-blue text-sm">{n.title}</p>
+                                                 <p className="text-xs text-gray-400 line-clamp-1">{n.message}</p>
+                                              </div>
                                            </div>
                                            <button 
                                              onClick={async () => {
@@ -1701,8 +1844,9 @@ export default function App() {
                                   </div>
                                 </div>
                               </div>
+                            </div>
 
-                              <div className="app-card dark:bg-slate-900 border-gray-100 dark:border-slate-800 space-y-6 text-brand-blue dark:text-white">
+                            <div className="app-card dark:bg-slate-900 border-gray-100 dark:border-slate-800 space-y-6 text-brand-blue dark:text-white">
                               <h3 className="font-bold flex items-center gap-2"><PenTool size={18} /> Visual Branding</h3>
                               <div className="space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
@@ -1753,36 +1897,86 @@ export default function App() {
                                 </button>
                               </div>
                             </div>
-                          </div>
 
-                          <div className="app-card dark:bg-slate-900 border-gray-100 dark:border-slate-800 space-y-6">
-                              <h3 className="font-bold text-brand-blue dark:text-white flex items-center gap-2"><Phone size={18} /> Support Contacts</h3>
-                              <div className="space-y-4">
-                                <div>
-                                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Support Phone Number</label>
-                                  <input 
-                                    className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-4 font-bold text-sm dark:text-white"
-                                    value={appConfig.helpPhone}
-                                    onChange={(e) => setAppConfig({ ...appConfig, helpPhone: e.target.value })}
-                                  />
+                            <div className="space-y-8">
+                                <div className="app-card dark:bg-slate-900 border-gray-100 dark:border-slate-800 space-y-6">
+                                  <h3 className="font-bold text-brand-blue dark:text-white flex items-center gap-2"><Phone size={18} /> Support Contacts</h3>
+                                  <div className="space-y-4">
+                                    <div>
+                                      <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Support Phone Number</label>
+                                      <input 
+                                        className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-4 font-bold text-sm dark:text-white"
+                                        value={appConfig.helpPhone}
+                                        onChange={(e) => setAppConfig({ ...appConfig, helpPhone: e.target.value })}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Support Email</label>
+                                      <input 
+                                        className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-4 font-bold text-sm dark:text-white"
+                                        value={appConfig.helpEmail}
+                                        onChange={(e) => setAppConfig({ ...appConfig, helpEmail: e.target.value })}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">WhatsApp Link/Number</label>
+                                      <input 
+                                        className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-4 font-bold text-sm dark:text-white"
+                                        value={appConfig.helpWhatsapp}
+                                        onChange={(e) => setAppConfig({ ...appConfig, helpWhatsapp: e.target.value })}
+                                      />
+                                    </div>
+                                  </div>
                                 </div>
-                                <div>
-                                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Support Email</label>
-                                  <input 
-                                    className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-4 font-bold text-sm dark:text-white"
-                                    value={appConfig.helpEmail}
-                                    onChange={(e) => setAppConfig({ ...appConfig, helpEmail: e.target.value })}
-                                  />
+
+                                <div className="app-card dark:bg-slate-900 border-gray-100 dark:border-slate-800 space-y-6">
+                                  <h3 className="font-bold text-brand-blue dark:text-white flex items-center gap-2">
+                                    <Sparkles size={18} className="text-brand-gold" /> AI Powered Features
+                                  </h3>
+                                  <div className="space-y-4">
+                                    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-800 rounded-xl">
+                                      <div>
+                                        <p className="font-bold text-sm dark:text-white">{lang === 'sw' ? 'Washa AI' : 'Enable AI'}</p>
+                                        <p className="text-[10px] text-gray-400 font-medium">Auto-process inquiries & applications</p>
+                                      </div>
+                                      <button 
+                                        onClick={() => setAppConfig({ ...appConfig, aiEnabled: !appConfig.aiEnabled })}
+                                        className={`w-12 h-6 rounded-full transition-all relative ${appConfig.aiEnabled ? 'bg-brand-gold' : 'bg-gray-200 dark:bg-slate-700'}`}
+                                      >
+                                        <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${appConfig.aiEnabled ? 'right-1' : 'left-1'}`} />
+                                      </button>
+                                    </div>
+
+                                    <div>
+                                      <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Gemini API Key</label>
+                                      <input 
+                                        type="password"
+                                        placeholder="Enter your Gemini API key"
+                                        className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-4 font-bold text-sm dark:text-white"
+                                        value={appConfig.geminiApiKey || ''}
+                                        onChange={(e) => setAppConfig({ ...appConfig, geminiApiKey: e.target.value })}
+                                      />
+                                      <p className="mt-2 text-[10px] text-gray-400 italic">Leaves empty to use system default key</p>
+                                    </div>
+
+                                    <button 
+                                      onClick={async () => {
+                                        try {
+                                          const { doc, setDoc } = await import('firebase/firestore');
+                                          const { db } = await import('./lib/firebase');
+                                          await setDoc(doc(db, 'appConfig', 'main'), appConfig, { merge: true });
+                                          alert(lang === 'sw' ? 'Mipangilio ya AI imehifadhiwa!' : 'AI Settings saved successfully!');
+                                        } catch (error: any) {
+                                          handleFirestoreError(error, OperationType.WRITE, 'appConfig/main');
+                                          alert(lang === 'sw' ? 'Hitilafu: ' + error.message : 'Error: ' + error.message);
+                                        }
+                                      }}
+                                      className="w-full btn-primary py-4 rounded-xl shadow-lg shadow-brand-gold/10"
+                                    >
+                                      {lang === 'sw' ? 'Hifadhi Mipangilio ya AI' : 'Save AI Settings'}
+                                    </button>
+                                  </div>
                                 </div>
-                                <div>
-                                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">WhatsApp Link/Number</label>
-                                  <input 
-                                    className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-4 font-bold text-sm dark:text-white"
-                                    value={appConfig.helpWhatsapp}
-                                    onChange={(e) => setAppConfig({ ...appConfig, helpWhatsapp: e.target.value })}
-                                  />
-                                </div>
-                              </div>
                             </div>
                           </div>
                         )}
@@ -2634,19 +2828,21 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        <motion.button 
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          onClick={() => setShowAiAssistant(!showAiAssistant)}
-          className="bg-brand-gold text-brand-blue p-4 rounded-full shadow-2xl relative group"
-        >
-          <Sparkles size={28} />
-          {!showAiAssistant && (
-             <div className="absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-brand-blue text-white text-[10px] font-black uppercase tracking-widest py-2 px-4 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap hidden md:block">
-               {lang === 'sw' ? 'Uliza AI Assistant' : 'Ask AI Assistant'}
-             </div>
-          )}
-        </motion.button>
+        {appConfig.aiEnabled && (
+          <motion.button 
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setShowAiAssistant(!showAiAssistant)}
+            className="bg-brand-gold text-brand-blue p-4 rounded-full shadow-2xl relative group"
+          >
+            <Sparkles size={28} />
+            {!showAiAssistant && (
+               <div className="absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-brand-blue text-white text-[10px] font-black uppercase tracking-widest py-2 px-4 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap hidden md:block">
+                 {lang === 'sw' ? 'Uliza AI Assistant' : 'Ask AI Assistant'}
+               </div>
+            )}
+          </motion.button>
+        )}
       </div>
 
       {/* Mobile Bottom Nav */}
