@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { 
   Building2, 
   HandCoins, 
@@ -156,6 +156,9 @@ interface AppConfig {
   helpWhatsapp?: string;
   aiEnabled?: boolean;
   geminiApiKey?: string;
+  address?: string;
+  tin?: string;
+  vrn?: string;
 }
 
 interface LoanFormField {
@@ -369,66 +372,125 @@ const translations: Record<Language, Translation> = {
   }
 };
 
-const downloadPDFStatement = (user: any, applications: any[], lang: Language) => {
-  const doc = new jsPDF();
+const downloadPDFStatement = (user: any, applications: any[], lang: Language, appConfig: AppConfig) => {
+  const doc = new jsPDF({
+    unit: 'mm',
+    format: [80, 200] // Receipt style (80mm width)
+  });
+
   const t = lang === 'sw' ? {
-    title: 'TAARIFA YA MKOPO',
+    title: 'RESITI YA KIFISKO (EFD)',
     user: 'Mteja',
     date: 'Tarehe',
     phone: 'Simu',
-    summary: 'Muhtasari wa Mikopo',
+    summary: 'Miamala ya Mikopo',
     id: 'Na.',
-    loan: 'Mkopo',
+    loan: 'Aina',
     amount: 'Kiasi',
     status: 'Hali',
-    time: 'Tarehe ya Ombi'
+    time: 'Muda',
+    tin: 'TIN ya Kampuni',
+    vrn: 'VRN',
+    receipt: 'Namba ya Resiti',
+    footer: 'ASANTE KWA KUTUMIA HUDUMA ZETU'
   } : {
-    title: 'LOAN STATEMENT',
+    title: 'FISCAL RECEIPT (EFD)',
     user: 'Customer',
     date: 'Date',
     phone: 'Phone',
-    summary: 'Loan Summary',
+    summary: 'Loan Transactions',
     id: 'No.',
-    loan: 'Loan Type',
+    loan: 'Type',
     amount: 'Amount',
     status: 'Status',
-    time: 'Application Date'
+    time: 'Time',
+    tin: 'Company TIN',
+    vrn: 'VRN',
+    receipt: 'Receipt No',
+    footer: 'THANK YOU FOR CHOOSING US'
   };
 
-  // Header
-  doc.setFontSize(22);
-  doc.setTextColor(23, 37, 84); // Navy
-  doc.text('SMILE MICROFINANCE', 14, 20);
-  
-  doc.setFontSize(10);
-  doc.setTextColor(100);
-  doc.text(t.title, 14, 28);
-  doc.text(`${t.date}: ${new Date().toLocaleDateString()}`, 14, 33);
+  const receiptNo = 'SM-' + Math.random().toString(36).substring(7).toUpperCase();
+  const companyTIN = appConfig.tin || '123-456-789'; 
+  const companyVRN = appConfig.vrn || '40012345X';
+  const companyAddress = appConfig.address || 'P.O. BOX 1234, DAR ES SALAAM';
 
-  // User details
+  // Header - Centered for receipt look
+  if (appConfig.logoUrl) {
+    try {
+      doc.addImage(appConfig.logoUrl, 'PNG', 30, 5, 20, 20); // Center logo
+    } catch (e) {
+      console.warn("Could not add logo to PDF:", e);
+    }
+  }
+
   doc.setFontSize(12);
-  doc.setTextColor(0);
-  doc.text(`${t.user}: ${user.displayName || user.email}`, 14, 45);
-  doc.text(`${t.phone}: ${user.phone || 'N/A'}`, 14, 52);
+  doc.setFont('helvetica', 'bold');
+  const companyName = appConfig.name.toUpperCase();
+  const startYHeader = appConfig.logoUrl ? 30 : 10;
+  doc.text(companyName, 40, startYHeader, { align: 'center' });
+  
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.text(companyAddress, 40, startYHeader + 5, { align: 'center' });
+  doc.text(`${t.tin}: ${companyTIN}`, 40, startYHeader + 9, { align: 'center' });
+  doc.text(`${t.vrn}: ${companyVRN}`, 40, startYHeader + 13, { align: 'center' });
+  
+  doc.setLineDashPattern([1, 1], 0);
+  doc.line(5, startYHeader + 17, 75, startYHeader + 17);
 
-  // Table
+  doc.setFont('helvetica', 'bold');
+  doc.text(t.title, 40, startYHeader + 23, { align: 'center' });
+  doc.setLineDashPattern([1, 1], 0);
+  doc.line(5, startYHeader + 26, 75, startYHeader + 26);
+
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  const metadataStart = startYHeader + 32;
+  doc.text(`${t.receipt}: ${receiptNo}`, 10, metadataStart);
+  doc.text(`${t.date}: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`, 10, metadataStart + 4);
+  doc.text(`${t.user}: ${user.displayName || user.fullName || user.email}`, 10, metadataStart + 8);
+  doc.text(`${t.phone}: ${user.phone || 'N/A'}`, 10, metadataStart + 12);
+
+  // Table using autoTable for receipt width
   const tableData = applications.map((app, index) => [
     index + 1,
-    app.loanType || 'General',
-    `TSh ${Number(app.amount).toLocaleString()}`,
-    app.status,
-    new Date(app.timestamp).toLocaleDateString()
+    app.loanType?.split(' ')[0] || 'Gen',
+    Number(app.amount).toLocaleString(),
+    app.status.charAt(0)
   ]);
 
-  (doc as any).autoTable({
-    startY: 60,
-    head: [[t.id, t.loan, t.amount, t.status, t.time]],
+  autoTable(doc, {
+    startY: metadataStart + 18,
+    margin: { left: 5, right: 5 },
+    head: [[t.id, t.loan, t.amount, t.status]],
     body: tableData,
-    headStyles: { fillColor: [23, 37, 84] },
-    alternateRowStyles: { fillColor: [249, 250, 251] }
+    theme: 'plain',
+    styles: { fontSize: 6, cellPadding: 1 },
+    headStyles: { fontStyle: 'bold' },
+    columnStyles: {
+      0: { cellWidth: 5 },
+      1: { cellWidth: 35 },
+      2: { cellWidth: 20, halign: 'right' },
+      3: { cellWidth: 10, halign: 'center' }
+    }
   });
 
-  doc.save(`Smile_Statement_${user.uid.slice(0, 5)}.pdf`);
+  const finalY = (doc as any).lastAutoTable.finalY + 10;
+  
+  doc.setLineDashPattern([1, 1], 0);
+  doc.line(5, finalY, 75, finalY);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  const total = applications.reduce((acc, app) => acc + (app.status === 'Approved' ? Number(app.amount) : 0), 0);
+  doc.text(`TOTAL APPROVED: TSh ${total.toLocaleString()}`, 10, finalY + 7);
+  
+  doc.setFontSize(6);
+  doc.setFont('helvetica', 'normal');
+  doc.text(t.footer, 40, finalY + 15, { align: 'center' });
+  doc.text('FISCAL DEVICE SIMULATION', 40, finalY + 19, { align: 'center' });
+
+  doc.save(`EFD_Receipt_${receiptNo}.pdf`);
 };
 
 // --- SupportChat Component ---
@@ -851,7 +913,8 @@ const UserProfile = ({
   onDeleteAccount,
   onRepay,
   onChat,
-  showingChat
+  showingChat,
+  appConfig
 }: { 
   lang: Language, 
   user: any, 
@@ -865,7 +928,8 @@ const UserProfile = ({
   onDeleteAccount: () => void,
   onRepay: (loan: any) => void,
   onChat: () => void,
-  showingChat: boolean
+  showingChat: boolean,
+  appConfig: AppConfig
 }) => {
   const t = translations[lang].profile;
   const activeLoans = applications.filter(a => a.status === 'Approved');
@@ -904,7 +968,7 @@ const UserProfile = ({
                 <button className="w-full flex items-center gap-4 p-4 rounded-2xl bg-brand-blue text-white shadow-lg shadow-brand-blue/20 font-bold transition-all hover:scale-[1.02] active:scale-95">
                   <LayoutDashboard size={18} /> {t.loanSummary}
                 </button>
-                <button onClick={() => downloadPDFStatement(user, applications, lang)} className="w-full flex items-center gap-4 p-4 rounded-2xl text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 font-bold transition-all group">
+                <button onClick={() => downloadPDFStatement(user, applications, lang, appConfig)} className="w-full flex items-center gap-4 p-4 rounded-2xl text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 font-bold transition-all group">
                   <Download size={18} className="group-hover:scale-110 transition-transform" /> {t.statement}
                 </button>
                 <button onClick={onChat} className={`w-full flex items-center gap-4 p-4 rounded-2xl font-bold transition-all group ${showingChat ? 'bg-brand-gold/10 text-brand-gold' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-white/5'}`}>
@@ -1707,7 +1771,10 @@ export default function App() {
     helpEmail: 'support@coshve.co.tz',
     helpWhatsapp: '+255 700 000 000',
     aiEnabled: true,
-    geminiApiKey: ''
+    geminiApiKey: '',
+    address: 'P.O. BOX 1234, DAR ES SALAAM',
+    tin: '123-456-789',
+    vrn: '40012345X'
   });
   const [calcAmount, setCalcAmount] = useState<number>(0);
   const [showAiAssistant, setShowAiAssistant] = useState(false);
@@ -2114,6 +2181,7 @@ export default function App() {
                 onRepay={(loan) => setRepayingLoan(loan)}
                 onChat={() => setShowingChat(!showingChat)}
                 showingChat={showingChat}
+                appConfig={appConfig}
               />
             </motion.div>
           )}
@@ -2572,6 +2640,33 @@ export default function App() {
                                     className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-4 font-bold text-sm dark:text-white"
                                     value={appConfig.logoUrl}
                                     onChange={(e) => setAppConfig({ ...appConfig, logoUrl: e.target.value })}
+                                  />
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Company TIN</label>
+                                    <input 
+                                      className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-4 font-bold text-sm dark:text-white"
+                                      value={appConfig.tin}
+                                      onChange={(e) => setAppConfig({ ...appConfig, tin: e.target.value })}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Company VRN</label>
+                                    <input 
+                                      className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-4 font-bold text-sm dark:text-white"
+                                      value={appConfig.vrn}
+                                      onChange={(e) => setAppConfig({ ...appConfig, vrn: e.target.value })}
+                                    />
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Company Address (Receipt Header)</label>
+                                  <input 
+                                    className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-4 font-bold text-sm dark:text-white"
+                                    value={appConfig.address}
+                                    onChange={(e) => setAppConfig({ ...appConfig, address: e.target.value })}
+                                    placeholder="e.g. P.O. BOX 1234, DAR ES SALAAM"
                                   />
                                 </div>
                                 <div>
@@ -3534,7 +3629,7 @@ export default function App() {
                   <MessagesSquare size={16} /> Live Chat
                 </button>
                 <button 
-                  onClick={() => downloadPDFStatement(selectedAdminUser, applications.filter(a => a.userId === selectedAdminUser.id), lang)}
+                  onClick={() => downloadPDFStatement(selectedAdminUser, applications.filter(a => a.userId === selectedAdminUser.id), lang, appConfig)}
                   className="py-4 rounded-2xl bg-emerald-500 text-white font-bold text-xs shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2"
                 >
                   <Download size={16} /> Statement
