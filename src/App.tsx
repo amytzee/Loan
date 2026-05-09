@@ -86,7 +86,7 @@ import { AuthView } from './components/AuthView';
 
 // --- Types ---
 type Language = 'sw' | 'en';
-const ADMIN_EMAILS = ['admin@gmail.com', 'amytzee@gmail.com'];
+const ADMIN_EMAILS = ['amytzee@gmail.com'];
 
 interface Translation {
   nav: { home: string; services: string; about: string; process: string; apply: string; login: string; register: string };
