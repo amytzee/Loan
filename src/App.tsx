@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 import { 
   Building2, 
   HandCoins, 
@@ -40,8 +42,27 @@ import {
   Sun,
   Sparkles,
   MessageSquare,
-  Laptop
+  Laptop,
+  Lock,
+  LogOut,
+  Calendar,
+  Send,
+  Trash2,
+  Gift,
+  HelpCircle,
+  ExternalLink,
+  Download,
+  Share2,
+  MessagesSquare
 } from 'lucide-react';
+
+interface ChatMessage {
+  id?: string;
+  senderId: string;
+  text: string;
+  timestamp: string;
+  isAdmin: boolean;
+}
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from '@google/genai';
 
@@ -102,6 +123,24 @@ interface Translation {
     amount: string;
     submit: string;
     types: string[];
+  };
+  metrics: {
+    customers: string;
+    disbursed: string;
+    experience: string;
+    success: string;
+  };
+  profile: {
+    title: string;
+    loanSummary: string;
+    activeLoans: string;
+    nextPayment: string;
+    history: string;
+    status: string;
+    notifs: string;
+    settings: string;
+    repay: string;
+    statement: string;
   };
 }
 
@@ -166,7 +205,7 @@ const translations: Record<Language, Translation> = {
       business: {
         title: 'Mkopo wa Biashara',
         desc: 'Kuza biashara yako leo kwa mtaji wenye masharti nafuu. Tunathamini mzunguko wa biashara yako.',
-        features: ['Hadi TZS 10M', 'Mchakato wa siku moja', 'Ushauri wa bure']
+        features: ['Hadi TSh 10M', 'Mchakato wa siku moja', 'Ushauri wa bure']
       },
       rental: {
         title: 'Mkopo wa Kodi',
@@ -215,9 +254,27 @@ const translations: Record<Language, Translation> = {
       name: 'Jina lako Kamili',
       phone: 'Namba ya Simu',
       type: 'Aina ya Mkopo',
-      amount: 'Kiasi (TZS)',
+      amount: 'Kiasi (TSh)',
       submit: 'TUMA MAOMBI',
       types: ['Mkopo Binafsi', 'Mkopo wa Biashara', 'Mkopo wa Kodi', 'Mkopo wa Ada']
+    },
+    metrics: {
+      customers: 'Wateja Waliofikiwa',
+      disbursed: 'Mikopo Inayozunguka',
+      experience: 'Miaka ya Uzoefu',
+      success: 'Viwango vya Mafanikio'
+    },
+    profile: {
+      title: 'Dashibodi Yangu',
+      loanSummary: 'Muhtasari wa Mkopo',
+      activeLoans: 'Mikopo Amilifu',
+      nextPayment: 'Malipo Yajayo',
+      history: 'Historia ya Maombi',
+      status: 'Hali ya Mkopo',
+      notifs: 'Taarifa',
+      settings: 'Mipangilio',
+      repay: 'Lipa Sasa',
+      statement: 'Download Statement'
     }
   },
   en: {
@@ -238,7 +295,7 @@ const translations: Record<Language, Translation> = {
       business: {
         title: 'Business Loan',
         desc: 'Grow your business today with affordable capital. We value your business cash flow.',
-        features: ['Up to TZS 10M', 'One-day process', 'Free business advice']
+        features: ['Up to TSh 10M', 'One-day process', 'Free business advice']
       },
       rental: {
         title: 'Rental Loan',
@@ -287,14 +344,324 @@ const translations: Record<Language, Translation> = {
       name: 'Full Name',
       phone: 'Phone Number',
       type: 'Loan Type',
-      amount: 'Amount (TZS)',
+      amount: 'Amount (TSh)',
       submit: 'SUBMIT APPLICATION',
       types: ['Personal Loan', 'Business Loan', 'Rental Loan', 'School Fees Loan']
+    },
+    metrics: {
+      customers: 'Happy Customers',
+      disbursed: 'Total Disbursed',
+      experience: 'Years of Experience',
+      success: 'Success Rate'
+    },
+    profile: {
+      title: 'My Dashboard',
+      loanSummary: 'Loan Summary',
+      activeLoans: 'Active Loans',
+      nextPayment: 'Next Payment',
+      history: 'Application History',
+      status: 'Loan Status',
+      notifs: 'Notifications',
+      settings: 'Account Settings',
+      repay: 'Repay Now',
+      statement: 'Download Statement'
     }
   }
 };
 
-// --- Navbar Component ---
+const downloadPDFStatement = (user: any, applications: any[], lang: Language) => {
+  const doc = new jsPDF();
+  const t = lang === 'sw' ? {
+    title: 'TAARIFA YA MKOPO',
+    user: 'Mteja',
+    date: 'Tarehe',
+    phone: 'Simu',
+    summary: 'Muhtasari wa Mikopo',
+    id: 'Na.',
+    loan: 'Mkopo',
+    amount: 'Kiasi',
+    status: 'Hali',
+    time: 'Tarehe ya Ombi'
+  } : {
+    title: 'LOAN STATEMENT',
+    user: 'Customer',
+    date: 'Date',
+    phone: 'Phone',
+    summary: 'Loan Summary',
+    id: 'No.',
+    loan: 'Loan Type',
+    amount: 'Amount',
+    status: 'Status',
+    time: 'Application Date'
+  };
+
+  // Header
+  doc.setFontSize(22);
+  doc.setTextColor(23, 37, 84); // Navy
+  doc.text('SMILE MICROFINANCE', 14, 20);
+  
+  doc.setFontSize(10);
+  doc.setTextColor(100);
+  doc.text(t.title, 14, 28);
+  doc.text(`${t.date}: ${new Date().toLocaleDateString()}`, 14, 33);
+
+  // User details
+  doc.setFontSize(12);
+  doc.setTextColor(0);
+  doc.text(`${t.user}: ${user.displayName || user.email}`, 14, 45);
+  doc.text(`${t.phone}: ${user.phone || 'N/A'}`, 14, 52);
+
+  // Table
+  const tableData = applications.map((app, index) => [
+    index + 1,
+    app.loanType || 'General',
+    `TSh ${Number(app.amount).toLocaleString()}`,
+    app.status,
+    new Date(app.timestamp).toLocaleDateString()
+  ]);
+
+  (doc as any).autoTable({
+    startY: 60,
+    head: [[t.id, t.loan, t.amount, t.status, t.time]],
+    body: tableData,
+    headStyles: { fillColor: [23, 37, 84] },
+    alternateRowStyles: { fillColor: [249, 250, 251] }
+  });
+
+  doc.save(`Smile_Statement_${user.uid.slice(0, 5)}.pdf`);
+};
+
+// --- SupportChat Component ---
+const SupportChat = ({ lang, user, isAdmin = false, targetUserId }: { lang: Language, user: any, isAdmin?: boolean, targetUserId?: string }) => {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [loading, setLoading] = useState(true);
+  const chatId = isAdmin ? targetUserId : user.uid;
+
+  useEffect(() => {
+    if (!chatId) return;
+    const { collection, query, orderBy, onSnapshot, limit } = require('firebase/firestore');
+    const { db } = require('./lib/firebase');
+
+    const q = query(
+      collection(db, 'support_messages', chatId, 'messages'),
+      orderBy('timestamp', 'asc'),
+      limit(50)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot: any) => {
+      setMessages(snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() })));
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [chatId]);
+
+  const sendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !chatId) return;
+
+    const { collection, addDoc, serverTimestamp } = require('firebase/firestore');
+    const { db } = require('./lib/firebase');
+
+    try {
+      await addDoc(collection(db, 'support_messages', chatId, 'messages'), {
+        senderId: user.uid,
+        text: newMessage,
+        timestamp: new Date().toISOString(),
+        isAdmin: isAdmin
+      });
+      setNewMessage('');
+    } catch (error) {
+      console.error('Error sending message:', error);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-[500px] bg-white dark:bg-slate-900 rounded-[2rem] overflow-hidden border border-gray-100 dark:border-white/5 shadow-2xl">
+      <div className="p-6 bg-brand-blue text-white flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
+            <MessageSquare size={20} className="text-brand-gold" />
+          </div>
+          <div>
+            <h4 className="font-bold text-sm">{lang === 'sw' ? 'Msaada wa Moja kwa Moja' : 'Live Support Chat'}</h4>
+            <p className="text-[10px] opacity-60 font-black uppercase tracking-widest">Online Now</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-hide bg-gray-50/50 dark:bg-slate-900/50">
+        {loading ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="w-8 h-8 border-4 border-brand-gold border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center p-8">
+            <Sparkles className="text-brand-gold/20 mb-4" size={48} />
+            <p className="text-sm font-bold text-gray-400">
+              {lang === 'sw' ? 'Anza mazungumzo nasi sasa hivi!' : 'Start a conversation with us now!'}
+            </p>
+          </div>
+        ) : (
+          messages.map((m, i) => (
+            <div key={m.id || i} className={`flex ${((isAdmin && m.isAdmin) || (!isAdmin && !m.isAdmin)) ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[80%] p-4 rounded-2xl text-sm ${
+                ((isAdmin && m.isAdmin) || (!isAdmin && !m.isAdmin))
+                  ? 'bg-brand-blue text-white rounded-tr-none shadow-lg shadow-brand-blue/10'
+                  : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-200 rounded-tl-none border border-gray-100 dark:border-white/5'
+              }`}>
+                {m.text}
+                <div className="text-[8px] mt-1 opacity-40 font-black uppercase tracking-tighter">
+                  {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <form onSubmit={sendMessage} className="p-4 bg-white dark:bg-slate-800 border-t border-gray-100 dark:border-white/10 flex gap-2">
+        <input 
+          type="text" 
+          value={newMessage}
+          onChange={(e) => setNewMessage(e.target.value)}
+          placeholder={lang === 'sw' ? 'Andika hapa...' : 'Type here...'}
+          className="flex-1 bg-gray-50 dark:bg-white/5 border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-gold transition-all"
+        />
+        <button type="submit" className="p-3 bg-brand-gold text-brand-blue rounded-xl hover:scale-105 active:scale-95 transition-all shadow-lg shadow-brand-gold/20">
+          <Send size={20} />
+        </button>
+      </form>
+    </div>
+  );
+};
+
+// --- RepaymentModal Component ---
+const RepaymentModal = ({ lang, loan, onClose }: { lang: Language, loan: any, onClose: () => void }) => {
+  const [step, setStep] = useState<'method' | 'prompt' | 'pin' | 'success'>('method');
+  const [phone, setPhone] = useState('');
+  const [provider, setProvider] = useState<'mpesa' | 'tigopesa' | 'airtel'>('mpesa');
+
+  const startPayment = () => {
+    if (!phone) return alert('Daka namba ya simu');
+    setStep('prompt');
+    setTimeout(() => setStep('pin'), 3000);
+  };
+
+  const verifyPIN = () => {
+    setStep('success');
+  };
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-md bg-brand-blue/20"
+    >
+      <motion.div 
+        initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }}
+        className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[2.5rem] shadow-2xl relative overflow-hidden"
+      >
+        <button onClick={onClose} className="absolute top-6 right-6 p-2 text-gray-400 hover:text-brand-blue transition-colors z-10">
+          <X size={24} />
+        </button>
+
+        <div className="p-8">
+          {step === 'method' && (
+            <div>
+              <h3 className="text-2xl font-bold text-brand-blue dark:text-white mb-2">
+                {lang === 'sw' ? 'Lipa Mkopo' : 'Repay Loan'}
+              </h3>
+              <p className="text-sm text-gray-400 mb-8 font-medium">TSh {Number(loan.amount).toLocaleString()} • {loan.loanType}</p>
+              
+              <div className="space-y-4 mb-8">
+                <button 
+                  onClick={() => setProvider('mpesa')}
+                  className={`w-full p-4 rounded-2xl flex items-center justify-between border-2 transition-all ${provider === 'mpesa' ? 'border-brand-gold bg-brand-gold/5' : 'border-gray-50 dark:border-white/5 bg-gray-50 dark:bg-white/5'}`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center text-white font-black italic">M</div>
+                    <span className="font-bold text-brand-blue dark:text-white">M-Pesa</span>
+                  </div>
+                  {provider === 'mpesa' && <CheckCircle className="text-brand-gold" size={20} />}
+                </button>
+                <button 
+                  onClick={() => setProvider('tigopesa')}
+                  className={`w-full p-4 rounded-2xl flex items-center justify-between border-2 transition-all ${provider === 'tigopesa' ? 'border-brand-gold bg-brand-gold/5' : 'border-gray-50 dark:border-white/5 bg-gray-50 dark:bg-white/5'}`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center text-white font-black italic">T</div>
+                    <span className="font-bold text-brand-blue dark:text-white">Tigo Pesa</span>
+                  </div>
+                  {provider === 'tigopesa' && <CheckCircle className="text-brand-gold" size={20} />}
+                </button>
+              </div>
+
+              <div className="mb-8">
+                <label className="block text-[10px] font-black uppercase text-gray-400 mb-2">{lang === 'sw' ? 'Namba ya Simu' : 'Phone Number'}</label>
+                <input 
+                  type="tel" 
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="0XXX XXX XXX"
+                  className="w-full p-4 bg-gray-50 dark:bg-white/5 border-none rounded-2xl font-bold focus:ring-2 focus:ring-brand-gold transition-all"
+                />
+              </div>
+
+              <button 
+                onClick={startPayment}
+                className="w-full py-4 bg-brand-blue text-white rounded-2xl font-bold shadow-xl shadow-brand-blue/20 flex items-center justify-center gap-2"
+              >
+                {lang === 'sw' ? 'ENDELEA' : 'CONTINUE'} <ArrowRight size={18} />
+              </button>
+            </div>
+          )}
+
+          {step === 'prompt' && (
+            <div className="py-12 text-center">
+              <div className="w-20 h-20 bg-brand-gold/10 rounded-full flex items-center justify-center mx-auto mb-6 relative">
+                 <div className="absolute inset-0 border-4 border-brand-gold border-t-transparent rounded-full animate-spin" />
+                 <Smartphone className="text-brand-gold" size={32} />
+              </div>
+              <h4 className="text-xl font-bold text-brand-blue dark:text-white mb-2">Simulating Push Prompt...</h4>
+              <p className="text-sm text-gray-400">Tafadhali kagua simu yako kupokea ujumbe wa {provider.toUpperCase()}.</p>
+            </div>
+          )}
+
+          {step === 'pin' && (
+            <div className="py-8 text-center">
+              <Lock className="mx-auto text-brand-gold mb-6" size={48} />
+              <h4 className="text-xl font-bold text-brand-blue dark:text-white mb-2">Enter PIN simulated</h4>
+              <p className="text-sm text-gray-400 mb-8">Ingiza PIN yako kwenye simu kukamilisha muamala.</p>
+              <button 
+                onClick={verifyPIN}
+                className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold shadow-xl shadow-emerald-500/20"
+              >
+                VERIFY (SIMULATED)
+              </button>
+            </div>
+          )}
+
+          {step === 'success' && (
+            <div className="py-12 text-center">
+              <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <CheckCircle className="text-emerald-500" size={48} />
+              </div>
+              <h4 className="text-2xl font-bold text-brand-blue dark:text-white mb-2">Payment Successful!</h4>
+              <p className="text-sm text-gray-400 mb-8">Malipo yako ya TSh {Number(loan.amount).toLocaleString()} yamepokelewa. Hali ya mkopo itabadilika muda mfupi.</p>
+              <button 
+                onClick={onClose}
+                className="w-full py-4 bg-brand-blue text-white rounded-2xl font-bold"
+              >
+                DONE
+              </button>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
 const Navbar = ({ lang, setLang, activeView, setActiveView, user, appConfig, setAppConfig, setShowingSupport, unreadCount, setShowNotifCenter }: { lang: Language, setLang: (l: Language) => void, activeView: string, setActiveView: (v: string) => void, user: any, appConfig: AppConfig, setAppConfig: (c: AppConfig) => void, setShowingSupport: (s: boolean) => void, unreadCount: number, setShowNotifCenter: (n: boolean) => void }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -368,9 +735,36 @@ const Navbar = ({ lang, setLang, activeView, setActiveView, user, appConfig, set
                 )}
               </button>
 
-              <a href="#apply" className="btn-primary py-3 px-6 shadow-brand-blue/30">
-                {t.apply}
-              </a>
+              {user ? (
+                <div className="flex items-center gap-4 pl-4 border-l border-gray-200">
+                  <button 
+                    onClick={() => setActiveView('profile')}
+                    className="flex flex-col items-end group"
+                  >
+                    <span className={`text-[10px] font-black uppercase tracking-widest ${scrolled ? 'text-brand-blue/40' : 'text-white/40'} group-hover:text-brand-gold transition-colors`}>{lang === 'sw' ? 'Mteja' : 'Client'}</span>
+                    <span className={`text-xs font-bold leading-none ${scrolled ? 'text-brand-blue' : 'text-white'}`}>{user.displayName?.split(' ')[0]}</span>
+                  </button>
+                  <button 
+                    onClick={() => setActiveView('profile')}
+                    className="w-10 h-10 rounded-full border-2 border-brand-gold/30 p-0.5 overflow-hidden hover:scale-110 transition-transform shadow-lg shadow-brand-blue/5"
+                  >
+                    <img src={user.photoURL || `https://i.pravatar.cc/100?u=${user.uid}`} className="w-full h-full object-cover rounded-full" />
+                  </button>
+                  {ADMIN_EMAILS.includes(user.email || '') && (
+                    <button 
+                      onClick={() => setActiveView('history')}
+                      className={`p-2 rounded-xl bg-brand-gold text-brand-blue hover:bg-white transition-all shadow-lg shadow-brand-gold/20`}
+                      title="Admin Dashboard"
+                    >
+                      <LayoutDashboard size={16} />
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <a href="#apply" className="btn-primary py-3 px-6 shadow-brand-blue/30">
+                  {t.apply}
+                </a>
+              )}
             </div>
 
             <div className="flex lg:hidden items-center gap-1.5 md:gap-3">
@@ -408,7 +802,266 @@ const Navbar = ({ lang, setLang, activeView, setActiveView, user, appConfig, set
   );
 };
 
-// --- Hero Component ---
+// --- MetricsGrid Component ---
+const MetricsGrid = ({ lang }: { lang: Language }) => {
+  const t = translations[lang].metrics;
+  const metrics = [
+    { icon: <Users size={32} />, value: '10,000+', label: t.customers, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { icon: <HandCoins size={32} />, value: 'TSh 5B+', label: t.disbursed, color: 'text-brand-gold', bg: 'bg-yellow-50' },
+    { icon: <History size={32} />, value: '5+', label: t.experience, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { icon: <CheckCircle size={32} />, value: '99%', label: t.success, color: 'text-rose-600', bg: 'bg-rose-50' }
+  ];
+
+  return (
+    <section className="py-20 bg-white">
+      <div className="max-w-7xl mx-auto px-4 md:px-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+          {metrics.map((m, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1 }}
+              viewport={{ once: true }}
+              className="p-8 rounded-[2.5rem] bg-gray-50/50 border border-gray-100 hover:border-brand-gold/30 hover:bg-white hover:shadow-2xl hover:shadow-brand-blue/5 transition-all group text-center"
+            >
+              <div className={`w-16 h-16 ${m.bg} ${m.color} rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform`}>
+                {m.icon}
+              </div>
+              <h3 className="text-3xl md:text-4xl font-bold text-brand-dark mb-2 tracking-tight">{m.value}</h3>
+              <p className="text-sm font-semibold text-gray-400 uppercase tracking-widest">{m.label}</p>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+// --- UserProfile Component ---
+const UserProfile = ({ 
+  lang, 
+  user, 
+  profileData, 
+  applications, 
+  onEdit, 
+  onChangePassword, 
+  onSupport, 
+  onSignOut, 
+  onDeleteAccount,
+  onRepay,
+  onChat,
+  showingChat
+}: { 
+  lang: Language, 
+  user: any, 
+  profileData: any, 
+  applications: any[], 
+  notifications: Notification[], 
+  onEdit: () => void, 
+  onChangePassword: () => void, 
+  onSupport: () => void, 
+  onSignOut: () => void, 
+  onDeleteAccount: () => void,
+  onRepay: (loan: any) => void,
+  onChat: () => void,
+  showingChat: boolean
+}) => {
+  const t = translations[lang].profile;
+  const activeLoans = applications.filter(a => a.status === 'Approved');
+
+  return (
+    <div className="pt-32 pb-20 bg-gray-50 dark:bg-slate-900 min-h-screen transition-colors">
+      {/* Floating Chat Button for Mobile */}
+      <button 
+        onClick={onChat}
+        className="fixed bottom-8 right-8 z-[60] w-16 h-16 bg-brand-gold text-brand-blue rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all lg:hidden"
+      >
+        {showingChat ? <X size={28} /> : <MessagesSquare size={28} />}
+      </button>
+
+      <div className="max-w-7xl mx-auto px-4 md:px-6">
+        <div className="grid lg:grid-cols-12 gap-8">
+          {/* Left Sidebar: Profile Info */}
+          <div className="lg:col-span-4 space-y-6">
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="bg-white dark:bg-slate-800 rounded-[3rem] p-8 shadow-xl shadow-brand-blue/5 border border-white dark:border-white/5"
+            >
+              <div className="text-center mb-8">
+                <div className="w-32 h-32 rounded-full border-4 border-brand-gold/20 mx-auto mb-4 overflow-hidden p-1 shadow-inner bg-gray-50 dark:bg-slate-900">
+                   <img src={user.photoURL || `https://i.pravatar.cc/200?u=${user.uid}`} className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
+                </div>
+                <h2 className="text-2xl font-bold text-brand-blue dark:text-white">{profileData?.fullName || user.displayName}</h2>
+                <p className="text-gray-400 font-medium text-sm">{user.email}</p>
+                <div className="mt-4 inline-flex items-center gap-2 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest">
+                  <ShieldCheck size={14} /> Verified Account
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <button className="w-full flex items-center gap-4 p-4 rounded-2xl bg-brand-blue text-white shadow-lg shadow-brand-blue/20 font-bold transition-all hover:scale-[1.02] active:scale-95">
+                  <LayoutDashboard size={18} /> {t.loanSummary}
+                </button>
+                <button onClick={() => downloadPDFStatement(user, applications, lang)} className="w-full flex items-center gap-4 p-4 rounded-2xl text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 font-bold transition-all group">
+                  <Download size={18} className="group-hover:scale-110 transition-transform" /> {t.statement}
+                </button>
+                <button onClick={onChat} className={`w-full flex items-center gap-4 p-4 rounded-2xl font-bold transition-all group ${showingChat ? 'bg-brand-gold/10 text-brand-gold' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-white/5'}`}>
+                  <MessagesSquare size={18} className="group-hover:rotate-12 transition-transform" /> {lang === 'sw' ? 'Chat ya Msaada' : 'Live Chat'}
+                </button>
+                <button onClick={onEdit} className="w-full flex items-center gap-4 p-4 rounded-2xl text-gray-500 hover:bg-gray-50 dark:hover:bg-white/5 font-bold transition-all hover:text-brand-blue group">
+                  <User size={18} className="group-hover:scale-110 transition-transform" /> {lang === 'sw' ? 'Hariri Profaili' : 'Edit Profile'}
+                </button>
+                <button onClick={onChangePassword} className="w-full flex items-center gap-4 p-4 rounded-2xl text-gray-500 hover:bg-gray-50 dark:hover:bg-white/5 font-bold transition-all hover:text-brand-blue group">
+                  <Lock size={18} className="group-hover:scale-110 transition-transform" /> {lang === 'sw' ? 'Badili Nywila' : 'Change Password'}
+                </button>
+                <button onClick={onSignOut} className="w-full flex items-center gap-4 p-4 rounded-2xl text-gray-500 hover:bg-gray-100 dark:hover:bg-rose-500/10 font-bold transition-all border-t border-gray-100 dark:border-white/5 mt-4 group">
+                  <LogOut size={18} className="group-hover:translate-x-1 transition-transform" /> {lang === 'sw' ? 'Ondoka' : 'Sign Out'}
+                </button>
+                <button onClick={onDeleteAccount} className="w-full flex items-center gap-4 p-4 rounded-2xl text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 font-bold transition-all group mt-2">
+                  <Trash2 size={18} className="group-hover:scale-110 transition-transform" /> {lang === 'sw' ? 'Futa Akaunti' : 'Delete Account'}
+                </button>
+              </div>
+            </motion.div>
+
+            {/* Chat for Desktop */}
+            <div className="hidden lg:block">
+              {showingChat && (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                  <SupportChat lang={lang} user={user} />
+                </motion.div>
+              )}
+            </div>
+          </div>
+
+          {/* Right Content: Dashboard */}
+          <div className="lg:col-span-8">
+            {showingChat && (
+              <div className="lg:hidden mb-8">
+                <SupportChat lang={lang} user={user} />
+              </div>
+            )}
+            <div className="grid md:grid-cols-2 gap-6 mb-8">
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="bg-brand-blue p-8 rounded-[3rem] text-white overflow-hidden relative shadow-2xl shadow-brand-blue/20"
+              >
+                <Wallet className="absolute top-[-10%] right-[-10%] w-48 h-48 text-white/5" />
+                <p className="text-white/60 font-bold uppercase tracking-widest text-[10px] mb-2">{t.activeLoans}</p>
+                <h3 className="text-4xl font-bold mb-4 tracking-tight">{activeLoans.length}</h3>
+                <div className="flex items-center gap-2 text-brand-gold text-sm font-black group cursor-pointer">
+                  <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" /> Manage Loans
+                </div>
+              </motion.div>
+
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="bg-brand-gold p-8 rounded-[3rem] text-brand-blue overflow-hidden relative shadow-2xl shadow-brand-gold/20"
+              >
+                <Clock className="absolute top-[-10%] right-[-10%] w-48 h-48 text-brand-blue/5" />
+                <p className="text-brand-blue/60 font-bold uppercase tracking-widest text-[10px] mb-2">{t.nextPayment}</p>
+                <h3 className="text-3xl font-bold mb-4 tracking-tight">TSh 150,000</h3>
+                <div className="flex items-center gap-2 text-brand-blue text-sm font-black">
+                  <Calendar size={16} /> 24 May 2024
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Referral Card */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="mb-8 bg-emerald-500 p-8 rounded-[3rem] text-white overflow-hidden relative shadow-2xl shadow-emerald-500/20"
+            >
+              <Users className="absolute top-[-10%] right-[-10%] w-48 h-48 text-white/5" />
+              <p className="text-white/60 font-bold uppercase tracking-widest text-[10px] mb-2">{lang === 'sw' ? 'MUALIKE RAFIKI' : 'REFER A FRIEND'}</p>
+              <h3 className="text-xl font-bold mb-2">{lang === 'sw' ? 'Mualike Rafiki, Pata Zawadi' : 'Refer a Friend, Get Rewards'}</h3>
+              <p className="text-xs opacity-80 mb-4">{lang === 'sw' ? 'Shiriki namba yako ya upatanishi na marafiki kupata punguzo la riba.' : 'Share your referral code with friends to get interest discounts.'}</p>
+              <div className="flex items-center gap-2 bg-white/10 p-3 rounded-xl border border-white/20">
+                <code className="flex-1 font-mono font-bold tracking-widest">{user.uid.slice(0, 8).toUpperCase()}</code>
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText(user.uid.slice(0, 8).toUpperCase());
+                    alert(lang === 'sw' ? 'Imenakiliwa!' : 'Copied!');
+                  }}
+                  className="bg-white text-emerald-600 px-4 py-1.5 rounded-lg text-[10px] font-black uppercase hover:bg-emerald-50 transition-colors"
+                >
+                  {lang === 'sw' ? 'NAKILI' : 'COPY'}
+                </button>
+              </div>
+            </motion.div>
+
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="bg-white dark:bg-slate-800 rounded-[3rem] p-8 shadow-xl shadow-brand-blue/5 border border-white dark:border-white/5"
+            >
+              <div className="flex items-center justify-between mb-8">
+                <h3 className="text-xl font-bold text-brand-blue dark:text-white flex items-center gap-3">
+                  <History className="text-brand-gold" /> {t.history}
+                </h3>
+              </div>
+
+              <div className="space-y-4">
+                {applications.length === 0 ? (
+                  <div className="text-center py-16 bg-gray-50 dark:bg-slate-900 rounded-[2rem] border border-dashed border-gray-200 dark:border-white/5">
+                    <AlertCircle className="mx-auto text-gray-200 dark:text-gray-800 mb-4" size={64} />
+                    <p className="text-gray-400 font-bold">{lang === 'sw' ? 'Hujatuma maombi yoyote bado.' : 'No applications found'}</p>
+                  </div>
+                ) : (
+                  applications.slice(0, 10).map((app, i) => (
+                    <div key={app.id || i} className="flex flex-col md:flex-row md:items-center justify-between p-6 rounded-3xl bg-gray-50 dark:bg-slate-900/50 hover:bg-brand-blue/5 dark:hover:bg-brand-blue/10 border border-transparent hover:border-brand-blue/10 transition-all group gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${
+                          app.status === 'Approved' ? 'bg-green-100 dark:bg-green-500/10 text-green-600' : 
+                          app.status === 'Rejected' ? 'bg-red-100 dark:bg-red-500/10 text-red-600' : 'bg-amber-100 dark:bg-amber-500/10 text-amber-600'
+                        }`}>
+                          {app.status === 'Approved' ? <CheckCircle2 size={24} /> : 
+                           app.status === 'Rejected' ? <XCircle size={24} /> : <Clock size={24} />}
+                        </div>
+                        <div>
+                          <p className="font-bold text-brand-blue dark:text-white tracking-tight">{app.loanType || 'General Loan'}</p>
+                          <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">{new Date(app.timestamp).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between md:justify-end gap-6">
+                        <div className="text-right">
+                          <p className="font-black text-brand-blue dark:text-white">TSh {Number(app.amount).toLocaleString()}</p>
+                          <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full ${
+                            app.status === 'Approved' ? 'bg-green-500 text-white' : 
+                            app.status === 'Rejected' ? 'bg-red-500 text-white' : 'bg-amber-500 text-white'
+                          }`}>
+                            {app.status}
+                          </span>
+                        </div>
+                        
+                        {app.status === 'Approved' && (
+                          <button 
+                            onClick={() => onRepay(app)}
+                            className="bg-brand-gold text-brand-blue px-4 py-2 rounded-xl font-bold text-xs shadow-lg shadow-brand-gold/20 hover:scale-105 transition-transform"
+                          >
+                            {t.repay}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 const Hero = ({ lang, users, appConfig }: { lang: Language, users: any[], appConfig: AppConfig }) => {
   const t = translations[lang].hero;
   
@@ -712,7 +1365,7 @@ const LoanCalculator = ({ lang }: { lang: Language }) => {
                 <div className="space-y-4 md:space-y-6">
                   <div className="flex justify-between items-center text-[10px] md:text-xs font-black uppercase tracking-widest text-slate-400">
                     <span>{t.amount}</span>
-                    <span className="text-brand-gold">TZS {amount.toLocaleString()}</span>
+                    <span className="text-brand-gold">TSh {amount.toLocaleString()}</span>
                   </div>
                   <input 
                     type="range" min="100000" max="10000000" step="100000" value={amount}
@@ -738,18 +1391,18 @@ const LoanCalculator = ({ lang }: { lang: Language }) => {
             <div className="glass rounded-[2rem] md:rounded-[3rem] p-8 md:p-14 text-center">
               <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] md:text-xs mb-3 md:mb-4">{t.monthly}</p>
               <h3 className="text-4xl sm:text-5xl md:text-7xl font-display font-bold text-brand-gold mb-8 md:mb-10">
-                <span className="text-base md:text-2xl text-white opacity-50 mr-2">TZS</span>
+                <span className="text-base md:text-2xl text-white opacity-50 mr-2">TSh</span>
                 {Math.round(monthlyRepayment).toLocaleString()}
               </h3>
               
               <div className="space-y-4 mb-10 md:mb-12">
                 <div className="flex justify-between text-xs md:text-sm py-3 md:py-4 border-b border-white/5">
                   <span className="opacity-60 font-medium">{t.amount}</span>
-                  <span className="font-bold">TZS {amount.toLocaleString()}</span>
+                  <span className="font-bold">TSh {amount.toLocaleString()}</span>
                 </div>
                  <div className="flex justify-between text-xs md:text-sm py-3 md:py-4 border-b border-white/5">
                   <span className="opacity-60 font-medium">{t.total}</span>
-                  <span className="font-bold text-brand-gold">TZS {Math.round(totalRepayment).toLocaleString()}</span>
+                  <span className="font-bold text-brand-gold">TSh {Math.round(totalRepayment).toLocaleString()}</span>
                 </div>
               </div>
 
@@ -868,6 +1521,52 @@ const ContactForm = ({ lang, user }: { lang: Language, user: any }) => {
               </button>
             </form>
           </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+// --- FAQ Component ---
+const FAQ = ({ lang }: { lang: Language }) => {
+  const faqs = lang === 'sw' ? [
+    { q: 'Inachukua muda gani kupata mkopo?', a: 'Maombi mengi hukaguliwa na kukamilika ndani ya saa 2 hadi 24 za kazi.' },
+    { q: 'Nahitaji dhamana gani?', a: 'Dhamana inategemea aina ya mkopo. Kwa mikopo midogo, vitambulisho na wadhamini wanatosha.' },
+    { q: 'Naweza kulipa mkopo kabla ya wakati?', a: 'Ndiyo, unaweza kulipa mapema na kupata punguzo la riba kwa baadhi ya mikopo.' },
+    { q: 'Nifanyeje ikiwa siwezi kulipa kwa wakati?', a: 'Tafadhali wasiliana nasi haraka iwezekanavyo kupitia msaada ili kupata ufumbuzi.' }
+  ] : [
+    { q: 'How long does it take to get a loan?', a: 'Most applications are reviewed and processed within 2 to 24 business hours.' },
+    { q: 'What collateral do I need?', a: 'Collateral depends on the loan type. For small loans, IDs and guarantors are sufficient.' },
+    { q: 'Can I pay my loan early?', a: 'Yes, early repayment is allowed and may qualify you for interest discounts.' },
+    { q: 'What if I cannot pay on time?', a: 'Please contact us immediately via support to discuss possible solutions.' }
+  ];
+
+  return (
+    <section className="py-24 bg-white dark:bg-slate-900 transition-colors">
+      <div className="max-w-4xl mx-auto px-4 md:px-6">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl md:text-4xl font-display font-bold text-brand-blue dark:text-white mb-4 italic">
+            {lang === 'sw' ? 'Maswali Yanayoulizwa Sana' : 'Frequently Asked Questions'}
+          </h2>
+          <div className="w-24 h-1 bg-brand-gold mx-auto rounded-full" />
+        </div>
+        <div className="space-y-6">
+          {faqs.map((f, i) => (
+            <motion.div 
+              key={i}
+              initial={{ opacity: 0, y: 10 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.1 }}
+              className="p-8 rounded-[2.5rem] bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-white/5 hover:border-brand-gold/30 transition-all group"
+            >
+              <h4 className="font-bold text-lg text-brand-blue dark:text-white mb-3 flex items-center gap-3">
+                <HelpCircle className="text-brand-gold group-hover:rotate-12 transition-transform" size={20} />
+                {f.q}
+              </h4>
+              <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed">{f.a}</p>
+            </motion.div>
+          ))}
         </div>
       </div>
     </section>
@@ -1017,11 +1716,16 @@ export default function App() {
   const [editingProfile, setEditingProfile] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [showingSupport, setShowingSupport] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [isDeletingUser, setIsDeletingUser] = useState<any | null>(null);
+  const [selectedAdminUser, setSelectedAdminUser] = useState<any | null>(null);
   const [editForm, setEditForm] = useState({ phone: '', fullName: '' });
   const [passwordForm, setPasswordForm] = useState({ current: '', new: '' });
   const [adminTab, setAdminTab] = useState<'loans' | 'users' | 'products' | 'settings' | 'notifs'>('loans');
   const [searchTerm, setSearchTerm] = useState('');
   const [showNotifCenter, setShowNotifCenter] = useState(false);
+  const [showingChat, setShowingChat] = useState(false);
+  const [repayingLoan, setRepayingLoan] = useState<any | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<LoanProduct | null>(null);
   const [editingProduct, setEditingProduct] = useState<LoanProduct | null>(null);
   const [broadcastMessage, setBroadcastMessage] = useState({ title: '', message: '', imageUrl: '', userId: 'all' });
@@ -1373,9 +2077,44 @@ export default function App() {
                   window.scrollTo(0, 0);
                 }} 
               />
+              <MetricsGrid lang={lang} />
               <Process lang={lang} />
               <LoanCalculator lang={lang} />
+              <FAQ lang={lang} />
               <ContactForm lang={lang} user={user} />
+            </motion.div>
+          )}
+
+          {activeView === 'profile' && user && (
+            <motion.div
+              key="profile"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+            >
+              <UserProfile 
+                lang={lang} 
+                user={user} 
+                profileData={profileData} 
+                applications={applications} 
+                notifications={notifications}
+                onEdit={() => {
+                  setEditForm({ phone: profileData?.phone || '', fullName: user?.displayName || profileData?.fullName || '' });
+                  setEditingProfile(true);
+                }}
+                onChangePassword={() => setChangingPassword(true)}
+                onSupport={() => setShowingSupport(true)}
+                onSignOut={() => {
+                  import('./lib/firebase').then(({ auth }) => auth.signOut());
+                  setUser(null);
+                  setProfileData(null);
+                  setActiveView('home');
+                }}
+                onDeleteAccount={() => setIsDeletingAccount(true)}
+                onRepay={(loan) => setRepayingLoan(loan)}
+                onChat={() => setShowingChat(!showingChat)}
+                showingChat={showingChat}
+              />
             </motion.div>
           )}
 
@@ -1475,17 +2214,13 @@ export default function App() {
                       <div className="p-4 bg-white/50 dark:bg-slate-900/50 rounded-2xl border border-gray-100 dark:border-slate-800">
                         <p className="text-[8px] font-black uppercase text-gray-400 mb-1">{lang === 'sw' ? 'Marejesho / Mwezi' : 'Monthly Payment'}</p>
                         <p className="font-display font-bold text-brand-blue dark:text-white">
-                          {new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS', maximumFractionDigits: 0 }).format(
-                            calcAmount ? (calcAmount * 1.15 / 12) : 0
-                          )}
+                          TSh {Math.round(calcAmount ? (calcAmount * 1.15 / 12) : 0).toLocaleString()}
                         </p>
                       </div>
                       <div className="p-4 bg-white/50 dark:bg-slate-900/50 rounded-2xl border border-gray-100 dark:border-slate-800">
                         <p className="text-[8px] font-black uppercase text-gray-400 mb-1">{lang === 'sw' ? 'Jumla (Riba 15%)' : 'Total (15% Interest)'}</p>
                         <p className="font-display font-bold text-emerald-600">
-                          {new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS', maximumFractionDigits: 0 }).format(
-                            calcAmount ? (calcAmount * 1.15) : 0
-                          )}
+                          TSh {Math.round(calcAmount ? (calcAmount * 1.15) : 0).toLocaleString()}
                         </p>
                       </div>
                     </div>
@@ -2089,7 +2824,10 @@ export default function App() {
                             animate={{ opacity: 1, y: 0 }}
                             className="app-card group relative overflow-hidden flex flex-col justify-between"
                           >
-                            <div className="flex items-start gap-4 mb-6 relative z-10">
+                            <div 
+                              onClick={() => setSelectedAdminUser(u)}
+                              className="flex items-start gap-4 mb-6 relative z-10 cursor-pointer hover:opacity-80 transition-opacity"
+                            >
                               <div className="relative">
                                 <img src={u.photoURL || 'https://i.pravatar.cc/150?u='+u.id} className="w-14 h-14 rounded-2xl object-cover ring-4 ring-brand-blue/5" referrerPolicy="no-referrer" />
                                 {u.email?.includes('gmail.com') && <div className="absolute -bottom-1 -right-1 bg-white p-1 rounded-full shadow-sm"><img src="https://www.google.com/favicon.ico" className="w-3 h-3" /></div>}
@@ -2105,8 +2843,7 @@ export default function App() {
                                 </div>
                               </div>
                             </div>
-                            
-                            <div className="grid grid-cols-2 gap-2 relative z-10">
+                            <div className="grid grid-cols-3 gap-2 relative z-10">
                                <button 
                                  onClick={() => {
                                    setAdminTab('notifs');
@@ -2114,7 +2851,7 @@ export default function App() {
                                  }}
                                  className="py-2.5 bg-brand-blue/5 text-brand-blue text-[10px] font-black uppercase rounded-xl hover:bg-brand-blue hover:text-white transition-all flex items-center justify-center gap-2 shadow-sm"
                                >
-                                 <Bell size={12} /> Message
+                                 <Bell size={12} />
                                </button>
                                <button 
                                  onClick={async () => {
@@ -2124,7 +2861,13 @@ export default function App() {
                                  }}
                                  className={`py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${u.isBlocked ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white' : 'bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white'}`}
                                >
-                                 {u.isBlocked ? 'Unblock' : 'Block'}
+                                 {u.isBlocked ? 'Un' : <Lock size={12} />}
+                               </button>
+                               <button 
+                                 onClick={() => setIsDeletingUser(u)}
+                                 className="py-2.5 bg-rose-50 text-rose-600 text-[10px] font-black uppercase rounded-xl hover:bg-rose-600 hover:text-white transition-all flex items-center justify-center gap-2 shadow-sm"
+                               >
+                                 <Trash2 size={12} />
                                </button>
                             </div>
                             
@@ -2335,7 +3078,7 @@ export default function App() {
                           </div>
                           <div className="text-right">
                             <p className="font-display font-black text-brand-blue text-lg">
-                              {new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS', maximumFractionDigits: 0 }).format(loan.amount)}
+                              TSh {Number(loan.amount || 0).toLocaleString()}
                             </p>
                             <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-lg ${
                                loan.status === 'Approved' ? 'bg-emerald-50 text-emerald-600' : 
@@ -2391,304 +3134,6 @@ export default function App() {
             </motion.div>
           )}
           
-          {activeView === 'profile' && (
-             <motion.div
-              key="profile"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 1.05 }}
-              className="max-w-md mx-auto px-4"
-            >
-              {user ? (
-                <div className="text-center mb-8">
-                  <div className="relative w-24 h-24 mx-auto mb-4">
-                    <img src={user.photoURL || profileData?.photoURL || 'https://i.pravatar.cc/150?u=' + user.uid} alt="profile" className="w-full h-full rounded-full border-4 border-white shadow-xl object-cover" referrerPolicy="no-referrer" />
-                    <div className="absolute bottom-0 right-0 w-6 h-6 bg-emerald-500 border-2 border-white rounded-full" />
-                  </div>
-                  <h2 className="text-2xl font-display font-bold text-brand-blue">
-                    {user.displayName || profileData?.fullName}
-                    {user && ADMIN_EMAILS.includes(user.email || '') && <span className="ml-2 text-[10px] bg-brand-gold text-brand-blue px-2 py-0.5 rounded-full">ADMIN</span>}
-                  </h2>
-                  <p className="text-gray-400">{user.email || profileData?.phone}</p>
-
-                  <div className="flex justify-center gap-4 mt-6">
-                    <button 
-                      onClick={() => setLang(lang === 'sw' ? 'en' : 'sw')}
-                      className="flex flex-col items-center gap-2 p-4 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 w-24 group hover:border-brand-gold transition-all"
-                    >
-                      <Globe className="text-brand-blue dark:text-brand-gold group-hover:scale-110 transition-transform" size={24} />
-                      <span className="text-[10px] font-black uppercase tracking-tight text-brand-blue dark:text-slate-200">{lang.toUpperCase()}</span>
-                    </button>
-                    <button 
-                      onClick={() => setAppConfig({ ...appConfig, themeMode: appConfig.themeMode === 'dark' ? 'light' : 'dark' })}
-                      className="flex flex-col items-center gap-2 p-4 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 w-24 group hover:border-brand-gold transition-all"
-                    >
-                      {appConfig.themeMode === 'dark' ? <Sun size={24} className="text-brand-gold group-hover:scale-110 transition-transform" /> : <Moon size={24} className="text-brand-blue group-hover:scale-110 transition-transform" />}
-                      <span className="text-[10px] font-black uppercase tracking-tight text-brand-blue dark:text-slate-200">{appConfig.themeMode.toUpperCase()}</span>
-                    </button>
-                  </div>
-                  
-                  {user && ADMIN_EMAILS.includes(user.email || '') && (
-                    <div className="mt-6 bg-brand-blue text-white p-4 rounded-2xl text-left">
-                       <p className="text-[10px] font-black uppercase tracking-widest opacity-50 mb-2">Admin Stats</p>
-                       <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <p className="text-2xl font-bold">{applications.length}</p>
-                            <p className="text-xs opacity-60">Total Apps</p>
-                          </div>
-                           <div>
-                            <p className="text-2xl font-bold">12</p>
-                            <p className="text-xs opacity-60">Waitlist</p>
-                          </div>
-                       </div>
-                    </div>
-                  )}
-
-                  <button onClick={() => { 
-                    import('./lib/firebase').then(({ auth }) => auth.signOut());
-                    setUser(null);
-                    setProfileData(null);
-                  }} className="mt-6 text-xs font-bold text-rose-500 uppercase tracking-widest hover:underline">Sign Out</button>
-                </div>
-              ) : (
-                <AuthView lang={lang} onSuccess={() => setActiveView('profile')} />
-              )}
-
-              <div className="space-y-3">
-                {[
-                  { icon: User, label: lang === 'sw' ? 'Taarifa za Binafsi' : 'Personal Information', action: () => {
-                    setEditForm({ phone: profileData?.phone || '', fullName: user?.displayName || profileData?.fullName || '' });
-                    setEditingProfile(true);
-                  } },
-                  { icon: ShieldCheck, label: lang === 'sw' ? 'Ulinzi na Uhakiki' : 'Security & Verification', action: () => setChangingPassword(true) },
-                  { icon: Globe, label: lang === 'sw' ? 'Badili Lugha (SW/EN)' : 'Change Language (EN/SW)', action: () => setLang(lang === 'sw' ? 'en' : 'sw') },
-                  { icon: appConfig.themeMode === 'dark' ? Sun : Moon, label: lang === 'sw' ? (appConfig.themeMode === 'dark' ? 'Hali ya Mchana' : 'Hali ya Usiku') : (appConfig.themeMode === 'dark' ? 'Light Mode' : 'Dark Mode'), action: () => setAppConfig({ ...appConfig, themeMode: appConfig.themeMode === 'dark' ? 'light' : 'dark' }) },
-                  { icon: Bell, label: lang === 'sw' ? 'Mipangilio ya Taarifa' : 'Notification Settings' },
-                  { icon: Phone, label: lang === 'sw' ? 'Msaada na Huduma' : 'Help & Support', action: () => setShowingSupport(true) },
-                ].map((item, i) => (
-                  <button 
-                    key={i} 
-                    className="app-card w-full flex items-center justify-between py-4 group"
-                    onClick={() => item.action && item.action()}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 group-hover:bg-brand-blue/5 group-hover:text-brand-blue transition-colors">
-                        <item.icon size={20} />
-                      </div>
-                      <span className="font-bold text-brand-blue dark:text-slate-200 text-sm">{item.label}</span>
-                    </div>
-                    {item.action ? (
-                      <div className="bg-brand-blue/5 text-brand-blue px-2 py-1 rounded-lg text-[10px] font-black uppercase">Active</div>
-                    ) : (
-                      <ChevronRight size={18} className="text-gray-300" />
-                    )}
-                  </button>
-                ))}
-              </div>
-
-              {/* Edit Profile Modal */}
-              <AnimatePresence>
-                {editingProfile && (
-                  <motion.div 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-[100] flex items-center justify-center px-4"
-                  >
-                    <div className="absolute inset-0 bg-brand-blue/20 backdrop-blur-sm" onClick={() => setEditingProfile(false)} />
-                    <motion.div 
-                      initial={{ scale: 0.9, y: 20 }}
-                      animate={{ scale: 1, y: 0 }}
-                      exit={{ scale: 0.9, y: 20 }}
-                      className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20"
-                    >
-                      <h3 className="text-xl font-display font-bold text-brand-blue dark:text-white mb-6">
-                        {lang === 'sw' ? 'Hariri Taarifa' : 'Edit Information'}
-                      </h3>
-                      
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">{lang === 'sw' ? 'Jina Kamili' : 'Full Name'}</label>
-                          <input 
-                            type="text" 
-                            className="app-input w-full"
-                            value={editForm.fullName}
-                            onChange={e => setEditForm({ ...editForm, fullName: e.target.value })}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">{lang === 'sw' ? 'Namba ya Simu' : 'Phone Number'}</label>
-                          <input 
-                            type="tel" 
-                            className="app-input w-full"
-                            placeholder="0..."
-                            value={editForm.phone}
-                            onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
-                          />
-                        </div>
-                        
-                        <div className="pt-4 flex gap-3">
-                          <button 
-                            onClick={() => setEditingProfile(false)}
-                            className="flex-1 py-3 rounded-xl border border-gray-100 dark:border-slate-800 font-bold text-xs text-gray-400"
-                          >
-                            {lang === 'sw' ? 'Ghairi' : 'Cancel'}
-                          </button>
-                          <button 
-                            onClick={async () => {
-                              try {
-                                const { doc, setDoc } = await import('firebase/firestore');
-                                const { db } = await import('./lib/firebase');
-                                await setDoc(doc(db, 'users', user.uid), {
-                                  phone: editForm.phone,
-                                  fullName: editForm.fullName,
-                                  updatedAt: new Date().toISOString()
-                                }, { merge: true });
-                                
-                                setProfileData({ ...profileData, phone: editForm.phone, fullName: editForm.fullName });
-                                setEditingProfile(false);
-                                alert(lang === 'sw' ? 'Taarifa zimehifadhiwa!' : 'Information saved!');
-                              } catch (error: any) {
-                                handleFirestoreError(error, OperationType.WRITE, 'users/' + user?.uid);
-                              }
-                            }}
-                            className="flex-1 py-3 rounded-xl bg-brand-blue text-white font-bold text-xs shadow-lg shadow-brand-blue/20"
-                          >
-                            {lang === 'sw' ? 'Hifadhi' : 'Save'}
-                          </button>
-                        </div>
-                      </div>
-                    </motion.div>
-                  </motion.div>
-                )}
-
-                {changingPassword && (
-                  <motion.div 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-[100] flex items-center justify-center px-4"
-                  >
-                    <div className="absolute inset-0 bg-brand-blue/20 backdrop-blur-sm" onClick={() => setChangingPassword(false)} />
-                    <motion.div 
-                      initial={{ scale: 0.9, y: 20 }}
-                      animate={{ scale: 1, y: 0 }}
-                      exit={{ scale: 0.9, y: 20 }}
-                      className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20"
-                    >
-                      <h3 className="text-xl font-display font-bold text-brand-blue dark:text-white mb-6">
-                        {lang === 'sw' ? 'Badili Nywila' : 'Change Password'}
-                      </h3>
-                      
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">{lang === 'sw' ? 'Nywila Mpya' : 'New Password'}</label>
-                          <input 
-                            type="password" 
-                            className="app-input w-full"
-                            value={passwordForm.new}
-                            onChange={e => setPasswordForm({ ...passwordForm, new: e.target.value })}
-                          />
-                        </div>
-                        
-                        <p className="text-[10px] text-gray-400 italic">
-                          {lang === 'sw' ? 'Kwa usalama, utahitajika kuingia tena baada ya kubadili nywila.' : 'For security, you may be logged out after updating your password.'}
-                        </p>
-
-                        <div className="pt-4 flex gap-3">
-                          <button 
-                            onClick={() => setChangingPassword(false)}
-                            className="flex-1 py-3 rounded-xl border border-gray-100 dark:border-slate-800 font-bold text-xs text-gray-400"
-                          >
-                            {lang === 'sw' ? 'Ghairi' : 'Cancel'}
-                          </button>
-                          <button 
-                            onClick={async () => {
-                              try {
-                                const { updatePassword } = await import('firebase/auth');
-                                const { auth } = await import('./lib/firebase');
-                                if (auth.currentUser) {
-                                  await updatePassword(auth.currentUser, passwordForm.new);
-                                  setChangingPassword(false);
-                                  alert(lang === 'sw' ? 'Nywila imebadilishwa kikamilifu!' : 'Password changed successfully!');
-                                }
-                              } catch (error: any) {
-                                alert(lang === 'sw' ? 'Hitilafu: ' + error.message : 'Error: ' + error.message);
-                              }
-                            }}
-                            className="flex-1 py-3 rounded-xl bg-brand-blue text-white font-bold text-xs shadow-lg shadow-brand-blue/20"
-                          >
-                            {lang === 'sw' ? 'Badili' : 'Update'}
-                          </button>
-                        </div>
-                      </div>
-                    </motion.div>
-                  </motion.div>
-                )}
-
-                {showingSupport && (
-                  <motion.div 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-[100] flex items-center justify-center px-4"
-                  >
-                    <div className="absolute inset-0 bg-brand-blue/20 backdrop-blur-sm" onClick={() => setShowingSupport(false)} />
-                    <motion.div 
-                      initial={{ scale: 0.9, y: 20 }}
-                      animate={{ scale: 1, y: 0 }}
-                      exit={{ scale: 0.9, y: 20 }}
-                      className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20"
-                    >
-                      <h3 className="text-xl font-display font-bold text-brand-blue dark:text-white mb-6">
-                        {lang === 'sw' ? 'Msaada na Huduma' : 'Help & Support'}
-                      </h3>
-                      
-                      <div className="space-y-6">
-                        <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-white/5 rounded-2xl">
-                          <div className="w-10 h-10 bg-brand-blue rounded-xl flex items-center justify-center text-white">
-                            <Phone size={20} />
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{lang === 'sw' ? 'Tupigie' : 'Call Us'}</p>
-                            <p className="font-bold text-brand-blue dark:text-white">{appConfig.helpPhone}</p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-white/5 rounded-2xl">
-                          <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white">
-                            <MessageSquare size={20} />
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">WhatsApp</p>
-                            <p className="font-bold text-brand-blue dark:text-white">{appConfig.helpWhatsapp}</p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-white/5 rounded-2xl">
-                          <div className="w-10 h-10 bg-brand-gold rounded-xl flex items-center justify-center text-brand-blue">
-                             <Mail size={20} />
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{lang === 'sw' ? 'Barua Pepe' : 'Email'}</p>
-                            <p className="font-bold text-brand-blue dark:text-white text-xs">{appConfig.helpEmail}</p>
-                          </div>
-                        </div>
-
-                        <button 
-                          onClick={() => setShowingSupport(false)}
-                          className="w-full py-4 rounded-2xl bg-brand-blue text-white font-bold text-sm shadow-xl shadow-brand-blue/20 mt-4"
-                        >
-                          {lang === 'sw' ? 'Funga' : 'Close'}
-                        </button>
-                      </div>
-                    </motion.div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.div>
-          )}
-
           {activeView === 'settings' && (
             <motion.div
               key="settings"
@@ -2757,11 +3202,511 @@ export default function App() {
           )}
         </AnimatePresence>
       </main>
+
+      {/* Global Modals */}
+      <AnimatePresence>
+        {editingProfile && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center px-4"
+          >
+            <div className="absolute inset-0 bg-brand-blue/20 backdrop-blur-sm" onClick={() => setEditingProfile(false)} />
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20"
+            >
+              <h3 className="text-xl font-display font-bold text-brand-blue dark:text-white mb-6">
+                {lang === 'sw' ? 'Hariri Taarifa' : 'Edit Information'}
+              </h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">{lang === 'sw' ? 'Jina Kamili' : 'Full Name'}</label>
+                  <input 
+                    type="text" 
+                    className="app-input w-full"
+                    value={editForm.fullName}
+                    onChange={e => setEditForm({ ...editForm, fullName: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">{lang === 'sw' ? 'Namba ya Simu' : 'Phone Number'}</label>
+                  <input 
+                    type="tel" 
+                    className="app-input w-full"
+                    placeholder="0..."
+                    value={editForm.phone}
+                    onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
+                  />
+                </div>
+                
+                <div className="pt-4 flex gap-3">
+                  <button 
+                    onClick={() => setEditingProfile(false)}
+                    className="flex-1 py-3 rounded-xl border border-gray-100 dark:border-slate-800 font-bold text-xs text-gray-400"
+                  >
+                    {lang === 'sw' ? 'Ghairi' : 'Cancel'}
+                  </button>
+                  <button 
+                    onClick={async () => {
+                      try {
+                        const { doc, setDoc } = await import('firebase/firestore');
+                        const { db } = await import('./lib/firebase');
+                        await setDoc(doc(db, 'users', user!.uid), {
+                          phone: editForm.phone,
+                          fullName: editForm.fullName,
+                          updatedAt: new Date().toISOString()
+                        }, { merge: true });
+                        
+                        setProfileData({ ...profileData, phone: editForm.phone, fullName: editForm.fullName });
+                        setEditingProfile(false);
+                        alert(lang === 'sw' ? 'Taarifa zimehifadhiwa!' : 'Information saved!');
+                      } catch (error: any) {
+                        handleFirestoreError(error, OperationType.WRITE, 'users/' + user?.uid);
+                      }
+                    }}
+                    className="flex-1 py-3 rounded-xl bg-brand-blue text-white font-bold text-xs shadow-lg shadow-brand-blue/20"
+                  >
+                    {lang === 'sw' ? 'Hifadhi' : 'Save'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {changingPassword && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center px-4"
+          >
+            <div className="absolute inset-0 bg-brand-blue/20 backdrop-blur-sm" onClick={() => setChangingPassword(false)} />
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20"
+            >
+              <h3 className="text-xl font-display font-bold text-brand-blue dark:text-white mb-6">
+                {lang === 'sw' ? 'Badili Nywila' : 'Change Password'}
+              </h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">{lang === 'sw' ? 'Nywila Mpya' : 'New Password'}</label>
+                  <input 
+                    type="password" 
+                    className="app-input w-full"
+                    value={passwordForm.new}
+                    onChange={e => setPasswordForm({ ...passwordForm, new: e.target.value })}
+                  />
+                </div>
+                
+                <p className="text-[10px] text-gray-400 italic">
+                  {lang === 'sw' ? 'Kwa usalama, utahitajika kuingia tena baada ya kubadili nywila.' : 'For security, you may be logged out after updating your password.'}
+                </p>
+
+                <div className="pt-4 flex gap-3">
+                  <button 
+                    onClick={() => setChangingPassword(false)}
+                    className="flex-1 py-3 rounded-xl border border-gray-100 dark:border-slate-800 font-bold text-xs text-gray-400"
+                  >
+                    {lang === 'sw' ? 'Ghairi' : 'Cancel'}
+                  </button>
+                  <button 
+                    onClick={async () => {
+                      try {
+                        const { updatePassword } = await import('firebase/auth');
+                        const { auth } = await import('./lib/firebase');
+                        if (auth.currentUser) {
+                          await updatePassword(auth.currentUser, passwordForm.new);
+                          setChangingPassword(false);
+                          alert(lang === 'sw' ? 'Nywila imebadilishwa kikamilifu!' : 'Password changed successfully!');
+                        }
+                      } catch (error: any) {
+                        alert(lang === 'sw' ? 'Hitilafu: ' + error.message : 'Error: ' + error.message);
+                      }
+                    }}
+                    className="flex-1 py-3 rounded-xl bg-brand-blue text-white font-bold text-xs shadow-lg shadow-brand-blue/20"
+                  >
+                    {lang === 'sw' ? 'Badili' : 'Update'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {showingSupport && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center px-4"
+          >
+            <div className="absolute inset-0 bg-brand-blue/20 backdrop-blur-sm" onClick={() => setShowingSupport(false)} />
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20"
+            >
+              <h3 className="text-xl font-display font-bold text-brand-blue dark:text-white mb-6">
+                {lang === 'sw' ? 'Msaada na Huduma' : 'Help & Support'}
+              </h3>
+              
+              <div className="space-y-6">
+                <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-white/5 rounded-2xl">
+                  <div className="w-10 h-10 bg-brand-blue rounded-xl flex items-center justify-center text-white">
+                    <Phone size={20} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{lang === 'sw' ? 'Tupigie' : 'Call Us'}</p>
+                    <p className="font-bold text-brand-blue dark:text-white">{appConfig.helpPhone}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-white/5 rounded-2xl">
+                  <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white">
+                    <MessageSquare size={20} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">WhatsApp</p>
+                    <p className="font-bold text-brand-blue dark:text-white">{appConfig.helpWhatsapp}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-white/5 rounded-2xl">
+                  <div className="w-10 h-10 bg-brand-gold rounded-xl flex items-center justify-center text-brand-blue">
+                     <Mail size={20} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{lang === 'sw' ? 'Barua Pepe' : 'Email'}</p>
+                    <p className="font-bold text-brand-blue dark:text-white text-xs">{appConfig.helpEmail}</p>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => setShowingSupport(false)}
+                  className="w-full py-4 rounded-2xl bg-brand-blue text-white font-bold text-sm shadow-xl shadow-brand-blue/20 mt-4"
+                >
+                  {lang === 'sw' ? 'Funga' : 'Close'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {selectedAdminUser && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center px-4"
+          >
+            <div className="absolute inset-0 bg-brand-blue/20 backdrop-blur-md" onClick={() => setSelectedAdminUser(null)} />
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[2.5rem] shadow-2xl relative z-10 border border-gray-100 dark:border-slate-800 flex flex-col max-h-[85vh] overflow-hidden"
+            >
+              <div className="p-8 border-b border-gray-100 dark:border-slate-800">
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center gap-6">
+                    <img 
+                      src={selectedAdminUser.photoURL || 'https://i.pravatar.cc/150?u='+selectedAdminUser.id} 
+                      className="w-20 h-20 rounded-[2rem] object-cover ring-4 ring-brand-blue/5" 
+                      referrerPolicy="no-referrer"
+                    />
+                    <div>
+                      <h3 className="text-2xl font-display font-bold text-brand-blue dark:text-white mb-1">
+                        {selectedAdminUser.fullName || 'Anonymous User'}
+                      </h3>
+                      <div className="flex flex-wrap gap-3">
+                        <span className="flex items-center gap-1.5 text-xs text-gray-400 font-bold bg-gray-50 dark:bg-white/5 px-3 py-1.5 rounded-full">
+                          <Mail size={12} /> {selectedAdminUser.email}
+                        </span>
+                        <span className="flex items-center gap-1.5 text-xs text-gray-400 font-bold bg-gray-50 dark:bg-white/5 px-3 py-1.5 rounded-full">
+                          <Smartphone size={12} /> {selectedAdminUser.phone || 'N/A'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <button onClick={() => setSelectedAdminUser(null)} className="p-3 bg-gray-50 dark:bg-white/5 rounded-2xl text-gray-400 hover:text-rose-500 transition-colors">
+                    <X size={24} />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {(() => {
+                    const userApps = applications.filter(a => a.userId === selectedAdminUser.id);
+                    const totalBorrowed = userApps.filter(a => a.status === 'Approved').reduce((acc, a) => acc + (a.amount || 0), 0);
+                    const activeLoans = userApps.filter(a => a.status === 'Approved');
+                    // Simple balance calculation logic
+                    const totalBalance = totalBorrowed; 
+                    return (
+                      <>
+                        <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-3xl">
+                          <p className="text-[10px] text-gray-400 font-black tracking-widest uppercase mb-1">Total Borrowed</p>
+                          <p className="text-lg font-bold text-brand-blue dark:text-white">TSh {totalBorrowed.toLocaleString()}</p>
+                        </div>
+                        <div className="p-4 bg-amber-50 dark:bg-amber-500/10 rounded-3xl">
+                          <p className="text-[10px] text-amber-600/60 font-black tracking-widest uppercase mb-1">Current Balance</p>
+                          <p className="text-lg font-bold text-amber-600">TSh {totalBalance.toLocaleString()}</p>
+                        </div>
+                        <div className="p-4 bg-emerald-50 dark:bg-emerald-500/10 rounded-3xl">
+                          <p className="text-[10px] text-emerald-600/60 font-black tracking-widest uppercase mb-1">Active Loans</p>
+                          <p className="text-lg font-bold text-emerald-600">{activeLoans.length}</p>
+                        </div>
+                        <div className="p-4 bg-brand-blue/5 rounded-3xl">
+                          <p className="text-[10px] text-brand-blue/60 font-black tracking-widest uppercase mb-1">{lang === 'sw' ? 'Marejesho' : 'Repayment'}</p>
+                          <p className="text-sm font-bold text-brand-blue dark:text-white">
+                            {activeLoans.length > 0 
+                              ? new Date(new Date(activeLoans[0].timestamp).getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()
+                              : 'N/A'}
+                          </p>
+                        </div>
+                      </>
+                    )
+                  })()}
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-8 space-y-6 scrollbar-hide">
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-4">{lang === 'sw' ? 'Historia ya Mikopo' : 'Loan History'}</h4>
+                  <div className="space-y-3">
+                    {applications.filter(a => a.userId === selectedAdminUser.id).length > 0 ? (
+                      applications.filter(a => a.userId === selectedAdminUser.id).map(loan => (
+                        <div key={loan.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/5">
+                          <div className="flex items-center gap-4">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                              loan.status === 'Approved' ? 'bg-emerald-100 text-emerald-600' : 
+                              loan.status === 'Rejected' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'
+                            }`}>
+                              <Building2 size={20} />
+                            </div>
+                            <div>
+                              <p className="font-bold text-brand-blue dark:text-white text-sm">{loan.loanType}</p>
+                              <p className="text-[10px] text-gray-400 font-bold uppercase">{new Date(loan.timestamp).toLocaleDateString()}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold text-brand-blue dark:text-white text-sm">TSh {(loan.amount || 0).toLocaleString()}</p>
+                            <p className={`text-[10px] font-black uppercase tracking-widest ${
+                              loan.status === 'Approved' ? 'text-emerald-500' : 
+                              loan.status === 'Rejected' ? 'text-rose-500' : 'text-amber-500'
+                            }`}>{loan.status}</p>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="py-10 text-center text-gray-400">
+                        <p className="text-sm font-bold">No loans found for this user.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-8 bg-gray-50 dark:bg-white/5 border-t border-gray-100 dark:border-slate-800 grid grid-cols-2 md:grid-cols-4 gap-4">
+                <button 
+                  onClick={() => {
+                    setAdminTab('notifs');
+                    setBroadcastMessage({ ...broadcastMessage, userId: selectedAdminUser.id });
+                    setSelectedAdminUser(null);
+                  }}
+                  className="py-4 rounded-2xl bg-brand-blue text-white font-bold text-xs shadow-xl shadow-brand-blue/20 flex items-center justify-center gap-2"
+                >
+                  <Bell size={16} /> Notification
+                </button>
+                <button 
+                  onClick={() => setShowingChat(true)}
+                  className="py-4 rounded-2xl bg-brand-gold text-brand-blue font-bold text-xs shadow-xl shadow-brand-gold/20 flex items-center justify-center gap-2"
+                >
+                  <MessagesSquare size={16} /> Live Chat
+                </button>
+                <button 
+                  onClick={() => downloadPDFStatement(selectedAdminUser, applications.filter(a => a.userId === selectedAdminUser.id), lang)}
+                  className="py-4 rounded-2xl bg-emerald-500 text-white font-bold text-xs shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2"
+                >
+                  <Download size={16} /> Statement
+                </button>
+                <button 
+                  onClick={async () => {
+                    const { doc, updateDoc } = await import('firebase/firestore');
+                    const { db } = await import('./lib/firebase');
+                    await updateDoc(doc(db, 'users', selectedAdminUser.id), { isBlocked: !selectedAdminUser.isBlocked });
+                    setSelectedAdminUser({ ...selectedAdminUser, isBlocked: !selectedAdminUser.isBlocked });
+                  }}
+                  className={`py-4 rounded-2xl font-bold text-xs shadow-xl flex items-center justify-center gap-2 ${
+                    selectedAdminUser.isBlocked ? 'bg-amber-500 text-white shadow-amber-500/20' : 'bg-rose-500 text-white shadow-rose-500/20'
+                  }`}
+                >
+                  <Lock size={16} /> {selectedAdminUser.isBlocked ? 'Unblock' : 'Block'}
+                </button>
+              </div>
+
+              {showingChat && (
+                <div className="p-8 border-t border-gray-100 dark:border-slate-800">
+                  <SupportChat lang={lang} user={user} isAdmin={true} targetUserId={selectedAdminUser.id} />
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+
+        {isDeletingUser && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center px-4"
+          >
+            <div className="absolute inset-0 bg-rose-500/10 backdrop-blur-sm" onClick={() => setIsDeletingUser(null)} />
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-rose-100"
+            >
+              <div className="w-16 h-16 bg-rose-100 dark:bg-rose-900/30 rounded-full flex items-center justify-center text-rose-600 mb-6 mx-auto">
+                <Trash2 size={32} />
+              </div>
+              <h3 className="text-xl font-display font-bold text-gray-900 dark:text-white mb-2 text-center">
+                {lang === 'sw' ? 'Futa Mtumiaji?' : 'Delete User?'}
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-8">
+                {lang === 'sw' 
+                  ? `Je, una uhakika unataka kumfuta ${isDeletingUser.fullName}? Taarifa zake zote zitafutwa.` 
+                  : `Are you sure you want to delete ${isDeletingUser.fullName}? All their data will be removed.`}
+              </p>
+              
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setIsDeletingUser(null)}
+                  className="flex-1 py-4 rounded-2xl border border-gray-100 dark:border-slate-800 font-bold text-sm text-gray-400"
+                >
+                  {lang === 'sw' ? 'Ghairi' : 'Cancel'}
+                </button>
+                <button 
+                  onClick={async () => {
+                    try {
+                      const { deleteDoc, doc } = await import('firebase/firestore');
+                      const { db } = await import('./lib/firebase');
+                      await deleteDoc(doc(db, 'users', isDeletingUser.id));
+                      setIsDeletingUser(null);
+                      alert(lang === 'sw' ? 'Mtumiaji amefutwa.' : 'User deleted successfully.');
+                    } catch (error: any) {
+                      alert(lang === 'sw' ? 'Hitilafu: ' + error.message : 'Error: ' + error.message);
+                    }
+                  }}
+                  className="flex-1 py-4 rounded-2xl bg-rose-600 text-white font-bold text-sm shadow-xl shadow-rose-600/30"
+                >
+                  {lang === 'sw' ? 'Futa' : 'Delete'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {isDeletingAccount && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center px-4"
+          >
+            <div className="absolute inset-0 bg-rose-500/10 backdrop-blur-sm" onClick={() => setIsDeletingAccount(false)} />
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-rose-100"
+            >
+              <div className="w-16 h-16 bg-rose-100 dark:bg-rose-900/30 rounded-full flex items-center justify-center text-rose-600 mb-6 mx-auto">
+                <Trash2 size={32} />
+              </div>
+              <h3 className="text-xl font-display font-bold text-gray-900 dark:text-white mb-2 text-center">
+                {lang === 'sw' ? 'Futa Akaunti yako?' : 'Delete your account?'}
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-8">
+                {lang === 'sw' 
+                  ? 'Kitendo hiki hakiwezi kubatilishwa. Taarifa zako zote na maombi ya mkopo yatafutwa kabisa.' 
+                  : 'This action cannot be undone. All your data and loan applications will be permanently deleted.'}
+              </p>
+              
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setIsDeletingAccount(false)}
+                  className="flex-1 py-4 rounded-2xl border border-gray-100 dark:border-slate-800 font-bold text-sm text-gray-400"
+                >
+                  {lang === 'sw' ? 'Hapana, Ghairi' : 'No, Cancel'}
+                </button>
+                <button 
+                  onClick={async () => {
+                    try {
+                      const { deleteDoc, doc } = await import('firebase/firestore');
+                      const { deleteUser } = await import('firebase/auth');
+                      const { db, auth } = await import('./lib/firebase');
+                      
+                      if (auth.currentUser) {
+                        const uid = auth.currentUser.uid;
+                        // 1. Delete Firestore Data
+                        await deleteDoc(doc(db, 'users', uid));
+                        // 2. Delete Auth Account
+                        await deleteUser(auth.currentUser);
+                        
+                        setUser(null);
+                        setProfileData(null);
+                        setIsDeletingAccount(false);
+                        setActiveView('home');
+                        alert(lang === 'sw' ? 'Akaunti imefutwa kikamilifu.' : 'Account deleted successfully.');
+                      }
+                    } catch (error: any) {
+                      if (error.code === 'auth/requires-recent-login') {
+                        alert(lang === 'sw' 
+                          ? 'Tafadhali ingia tena na ujaribu kufuta akaunti mara moja kwa sababu za kiusalama.' 
+                          : 'Please login again and try deleting your account immediately for security reasons.');
+                        import('./lib/firebase').then(({ auth }) => auth.signOut());
+                        setUser(null);
+                        setProfileData(null);
+                        setIsDeletingAccount(false);
+                      } else {
+                        alert(lang === 'sw' ? 'Hitilafu: ' + error.message : 'Error: ' + error.message);
+                      }
+                    }
+                  }}
+                  className="flex-1 py-4 rounded-2xl bg-rose-600 text-white font-bold text-sm shadow-xl shadow-rose-600/30"
+                >
+                  {lang === 'sw' ? 'Ndio, Futa' : 'Yes, Delete'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <Footer lang={lang} appConfig={appConfig} />
 
       {/* AI Assistant */}
       <div className="fixed bottom-24 right-6 md:bottom-10 md:right-10 z-[60]">
         <AnimatePresence>
+          {repayingLoan && (
+            <RepaymentModal 
+              lang={lang} 
+              loan={repayingLoan} 
+              onClose={() => setRepayingLoan(null)} 
+            />
+          )}
+
           {showAiAssistant && (
             <motion.div 
               initial={{ opacity: 0, scale: 0.8, y: 20 }}
