@@ -104,7 +104,8 @@ export const AuthView: React.FC<AuthViewProps> = ({ onSuccess, lang }) => {
           photoURL: photoURL,
           gender: formData.gender,
           role: 'user',
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          unreadByAdmin: true
         });
 
       } else {

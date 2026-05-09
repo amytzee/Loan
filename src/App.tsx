@@ -598,7 +598,8 @@ const SupportChat = ({ lang, user, profileData, isAdmin = false, targetUserId, h
         lastTimestamp: messageData.timestamp,
         unreadByAdmin: !isAdmin,
         userId: chatId,
-        userName: isAdmin ? (messages.find(m => !m.isAdmin)?.senderId || 'Client') : (profileData?.fullName || user.displayName || 'Client')
+        userName: isAdmin ? (messages.find(m => !m.isAdmin)?.senderId || 'Client') : (profileData?.fullName || user.displayName || 'Client'),
+        userPhoto: isAdmin ? null : (profileData?.photoURL || user.photoURL || null)
       }, { merge: true });
 
       setNewMessage('');
@@ -752,9 +753,9 @@ const SupportChat = ({ lang, user, profileData, isAdmin = false, targetUserId, h
                       {activeMessageId === m.id && (
                         <motion.div 
                           initial={{ opacity: 0, scale: 0.8, y: 10 }}
-                          animate={{ opacity: 1, scale: 1, y: -50 }}
+                          animate={{ opacity: 1, scale: 1, y: -60 }}
                           exit={{ opacity: 0, scale: 0.8, y: 10 }}
-                          className={`absolute ${isMe ? 'right-0' : 'left-0'} top-0 bg-white dark:bg-slate-800 shadow-2xl rounded-full p-2 border border-gray-100 dark:border-white/10 flex items-center gap-1 z-50`}
+                          className={`absolute ${isMe ? 'right-0' : 'left-0'} top-0 bg-white dark:bg-slate-800 shadow-2xl rounded-[1.5rem] p-1.5 border border-gray-100 dark:border-white/10 flex flex-wrap items-center gap-0.5 z-50 w-max max-w-[280px] pointer-events-auto`}
                           onMouseLeave={() => setActiveMessageId(null)}
                         >
                           {REACTION_EMOJIS.map(emoji => (
@@ -765,7 +766,7 @@ const SupportChat = ({ lang, user, profileData, isAdmin = false, targetUserId, h
                                 toggleReaction(m, emoji);
                                 setActiveMessageId(null);
                               }}
-                              className={`p-2 hover:scale-125 transition-transform text-lg ${reactions[emoji]?.includes(user.uid) ? 'bg-brand-gold/20 rounded-full' : ''}`}
+                              className={`p-2 hover:scale-125 transition-transform text-xl ${reactions[emoji]?.includes(user.uid) ? 'bg-brand-gold/20 rounded-full' : ''}`}
                             >
                               {emoji}
                             </button>
@@ -838,14 +839,14 @@ const SupportChat = ({ lang, user, profileData, isAdmin = false, targetUserId, h
         <div id="chat-bottom" />
       </div>
 
-      <form onSubmit={sendMessage} className="p-5 bg-white dark:bg-slate-800 border-t border-gray-100 dark:border-white/20 flex gap-3 relative z-30 shadow-[0_-8px_30px_rgba(0,0,0,0.1)] shrink-0">
+      <form onSubmit={sendMessage} className="p-4 md:p-5 bg-white dark:bg-slate-800 border-t border-gray-100 dark:border-white/20 flex gap-3 relative z-30 shadow-[0_-8px_30px_rgba(0,0,0,0.1)] shrink-0">
         <div className="flex-1 relative flex items-center">
           <input 
             type="text" 
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder={lang === 'sw' ? 'Andika ujumbe wako...' : 'Type a message...'}
-            className="w-full bg-gray-50 dark:bg-white/5 border border-transparent focus:border-brand-gold/30 rounded-2xl pl-5 pr-14 py-4 text-sm font-semibold focus:ring-0 transition-all dark:text-white placeholder:text-gray-400"
+            className="w-full bg-gray-50 dark:bg-white/5 border border-transparent focus:border-brand-gold/30 rounded-[1.5rem] pl-5 pr-12 py-4 text-sm font-semibold focus:ring-0 transition-all dark:text-white placeholder:text-gray-400 shadow-inner"
           />
           <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-3">
              <button type="button" className="text-gray-400 hover:text-brand-gold transition-all hover:scale-110">
@@ -1960,7 +1961,10 @@ const ContactForm = ({ lang, user }: { lang: Language, user: any }) => {
               try {
                 const { collection, addDoc } = await import('firebase/firestore');
                 const { db } = await import('./lib/firebase');
-                await addDoc(collection(db, 'applications'), data);
+                await addDoc(collection(db, 'applications'), {
+                  ...data,
+                  unreadByAdmin: true
+                });
                 alert(lang === 'sw' ? 'Ombi lako limepokelewa! Tutakucheki hivi punde.' : 'Application received! We will contact you soon.');
                 (e.target as HTMLFormElement).reset();
               } catch (err) {
@@ -2233,7 +2237,24 @@ export default function App() {
   const [selectedAdminUser, setSelectedAdminUser] = useState<any | null>(null);
   const [editForm, setEditForm] = useState({ phone: '', fullName: '', gender: '', photoURL: '' });
   const [passwordForm, setPasswordForm] = useState({ current: '', new: '' });
-  const [adminTab, setAdminTab] = useState<'loans' | 'users' | 'products' | 'settings' | 'notifs'>('loans');
+  const [adminTab, setAdminTab] = useState<'loans' | 'users' | 'products' | 'analytics' | 'notifs' | 'cms' | 'settings'>('analytics');
+
+  useEffect(() => {
+    if (user && ADMIN_EMAILS.includes(user.email || '')) {
+      if (adminTab === 'loans') {
+        const unread = applications.filter(a => a.unreadByAdmin);
+        unread.forEach(a => {
+          if (a.id) updateDoc(doc(db, 'applications', a.id), { unreadByAdmin: false }).catch(console.error);
+        });
+      }
+      if (adminTab === 'users') {
+        const unread = allUsers.filter((u: any) => u.unreadByAdmin);
+        unread.forEach((u: any) => {
+          if (u.id) updateDoc(doc(db, 'users', u.id), { unreadByAdmin: false }).catch(console.error);
+        });
+      }
+    }
+  }, [adminTab, applications.length, allUsers.length, user]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showNotifCenter, setShowNotifCenter] = useState(false);
   const [showingChat, setShowingChat] = useState(false);
@@ -2879,7 +2900,8 @@ export default function App() {
                       timestamp: new Date().toISOString(),
                       status: 'Pending',
                       amount: data['Amount'] || data['Loan Amount'] || 0,
-                      customData: data
+                      customData: data,
+                      unreadByAdmin: true
                     });
                     alert('Application submitted successfully!');
                     setActiveView('history');
@@ -3055,12 +3077,38 @@ export default function App() {
                           className={`px-4 py-2 rounded-xl text-xs font-bold capitalize transition-all whitespace-nowrap relative flex items-center gap-2 ${adminTab === tab ? 'bg-white text-brand-blue shadow-sm' : 'text-gray-400'}`}
                         >
                           {tab}
-                          {tab === 'users' && supportChats.some(c => c.unreadByAdmin) && (
+                          {(
+                            (tab === 'users' && (supportChats.some(c => c.unreadByAdmin) || allUsers.some((u: any) => u.unreadByAdmin))) ||
+                            (tab === 'loans' && applications.some(a => a.unreadByAdmin))
+                          ) && (
                             <span className="flex h-2 w-2 rounded-full bg-brand-gold animate-pulse shadow-[0_0_8px_rgba(255,191,0,0.8)]" />
                           )}
                         </button>
                       ))}
                     </div>
+                  </div>
+                )}
+                {user && ADMIN_EMAILS.includes(user?.email || '') && (
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    {(() => {
+                      const newLoans = applications.filter(a => a.unreadByAdmin).length;
+                      const newUsers = allUsers.filter((u: any) => u.unreadByAdmin).length;
+                      const newChats = supportChats.filter(c => c.unreadByAdmin).length;
+                      if (newLoans === 0 && newUsers === 0 && newChats === 0) return null;
+                      return (
+                        <div className="flex items-center gap-2 bg-brand-gold/10 px-4 py-2 rounded-2xl border border-brand-gold/20 shadow-sm animate-in fade-in slide-in-from-top-2">
+                           <Bell size={14} className="text-brand-gold animate-bounce" />
+                           <span className="text-[10px] font-black uppercase tracking-widest text-brand-blue">
+                             {lang === 'sw' ? 'Mambo Mapya:' : 'New Alerts:'}
+                           </span>
+                           <div className="flex gap-2">
+                             {newLoans > 0 && <span className="bg-brand-gold text-brand-blue px-2 py-0.5 rounded-full text-[9px] font-black">{newLoans} {lang === 'sw' ? 'Mkopo' : 'Loans'}</span>}
+                             {newUsers > 0 && <span className="bg-brand-gold text-brand-blue px-2 py-0.5 rounded-full text-[9px] font-black">{newUsers} {lang === 'sw' ? 'Watu' : 'Users'}</span>}
+                             {newChats > 0 && <span className="bg-brand-gold text-brand-blue px-2 py-0.5 rounded-full text-[9px] font-black">{newChats} {lang === 'sw' ? 'Chat' : 'Chats'}</span>}
+                           </div>
+                        </div>
+                      )
+                    })()}
                   </div>
                 )}
               </div>
