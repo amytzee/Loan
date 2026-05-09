@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { 
@@ -23,7 +23,9 @@ import {
   ArrowRight,
   Globe,
   Wallet,
-  PieChart,
+  PieChart as PieChartIcon,
+  BarChart3,
+  TrendingUp,
   User,
   History,
   LayoutDashboard,
@@ -57,8 +59,27 @@ import {
   Link as LinkIcon,
   Camera,
   Image,
-  Loader2
+  Loader2,
+  LineChart as LineChartIcon,
+  FileText
 } from 'lucide-react';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  LineChart,
+  Line
+} from 'recharts';
 
 interface ChatMessage {
   id?: string;
@@ -175,6 +196,12 @@ interface AppConfig {
   tin?: string;
   vrn?: string;
   heroGallery?: { url: string; caption: string }[];
+  homeTitleSw?: string;
+  homeTitleEn?: string;
+  homeSubtitleSw?: string;
+  homeSubtitleEn?: string;
+  aboutContentSw?: string;
+  aboutContentEn?: string;
 }
 
 interface LoanFormField {
@@ -1032,7 +1059,7 @@ const UserProfile = ({
   const activeLoans = applications.filter(a => a.status === 'Approved');
 
   return (
-    <div className="pt-32 pb-20 bg-gray-50 dark:bg-slate-900 min-h-screen transition-colors">
+    <div className="pt-24 md:pt-32 pb-20 bg-gray-50 dark:bg-slate-900 min-h-screen transition-colors">
       {/* Floating Chat Button for Mobile */}
       <button 
         onClick={onChat}
@@ -1048,14 +1075,14 @@ const UserProfile = ({
             <motion.div 
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              className="bg-white dark:bg-slate-800 rounded-[3rem] p-8 shadow-xl shadow-brand-blue/5 border border-white dark:border-white/5"
+              className="bg-white dark:bg-slate-800 rounded-[2.5rem] md:rounded-[3rem] p-6 md:p-8 shadow-xl shadow-brand-blue/5 border border-white dark:border-white/5"
             >
-              <div className="text-center mb-8">
-                <div className="w-32 h-32 rounded-full border-4 border-brand-gold/20 mx-auto mb-4 overflow-hidden p-1 shadow-inner bg-gray-50 dark:bg-slate-900">
+              <div className="text-center mb-6 md:mb-8">
+                <div className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-brand-gold/20 mx-auto mb-4 overflow-hidden p-1 shadow-inner bg-gray-50 dark:bg-slate-900">
                    <img src={profileData?.photoURL || user.photoURL || `https://i.pravatar.cc/200?u=${user.uid}`} className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
                 </div>
-                <h2 className="text-2xl font-bold text-brand-blue dark:text-white">{profileData?.fullName || user.displayName}</h2>
-                <p className="text-gray-400 font-medium text-sm mb-2">{user.email}</p>
+                <h2 className="text-xl md:text-2xl font-bold text-brand-blue dark:text-white truncate px-2">{profileData?.fullName || user.displayName}</h2>
+                <p className="text-gray-400 font-medium text-xs md:text-sm mb-2 truncate px-2">{user.email}</p>
                 {profileData?.gender && (
                   <p className="text-[10px] font-black uppercase tracking-widest text-brand-gold bg-brand-gold/10 px-3 py-1 rounded-full inline-block mb-3">
                     {profileData.gender === 'male' ? (lang === 'sw' ? 'Mwanaume' : 'Male') : 
@@ -1111,18 +1138,18 @@ const UserProfile = ({
                 <SupportChat lang={lang} user={user} />
               </div>
             )}
-            <div className="grid md:grid-cols-2 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-8">
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="bg-brand-blue p-8 rounded-[3rem] text-white overflow-hidden relative shadow-2xl shadow-brand-blue/20"
+                className="bg-brand-blue p-6 md:p-8 rounded-[2.5rem] md:rounded-[3rem] text-white overflow-hidden relative shadow-2xl shadow-brand-blue/20"
               >
-                <Wallet className="absolute top-[-10%] right-[-10%] w-48 h-48 text-white/5" />
-                <p className="text-white/60 font-bold uppercase tracking-widest text-[10px] mb-2">{t.activeLoans}</p>
-                <h3 className="text-4xl font-bold mb-4 tracking-tight">{activeLoans.length}</h3>
-                <div className="flex items-center gap-2 text-brand-gold text-sm font-black group cursor-pointer">
-                  <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" /> Manage Loans
+                <Wallet className="absolute top-[-10%] right-[-10%] w-32 md:w-48 h-32 md:h-48 text-white/5" />
+                <p className="text-white/60 font-bold uppercase tracking-widest text-[9px] md:text-[10px] mb-2">{t.activeLoans}</p>
+                <h3 className="text-3xl md:text-4xl font-bold mb-4 tracking-tight">{activeLoans.length}</h3>
+                <div className="flex items-center gap-2 text-brand-gold text-xs md:text-sm font-black group cursor-pointer">
+                  <ChevronRight size={14} md:size={16} className="group-hover:translate-x-1 transition-transform" /> Manage Loans
                 </div>
               </motion.div>
 
@@ -1130,13 +1157,13 @@ const UserProfile = ({
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="bg-brand-gold p-8 rounded-[3rem] text-brand-blue overflow-hidden relative shadow-2xl shadow-brand-gold/20"
+                className="bg-brand-gold p-6 md:p-8 rounded-[2.5rem] md:rounded-[3rem] text-brand-blue overflow-hidden relative shadow-2xl shadow-brand-gold/20"
               >
-                <Clock className="absolute top-[-10%] right-[-10%] w-48 h-48 text-brand-blue/5" />
-                <p className="text-brand-blue/60 font-bold uppercase tracking-widest text-[10px] mb-2">{t.nextPayment}</p>
-                <h3 className="text-3xl font-bold mb-4 tracking-tight">TSh 150,000</h3>
-                <div className="flex items-center gap-2 text-brand-blue text-sm font-black">
-                  <Calendar size={16} /> 24 May 2024
+                <Clock className="absolute top-[-10%] right-[-10%] w-32 md:w-48 h-32 md:h-48 text-brand-blue/5" />
+                <p className="text-brand-blue/60 font-bold uppercase tracking-widest text-[9px] md:text-[10px] mb-2">{t.nextPayment}</p>
+                <h3 className="text-2xl md:text-3xl font-bold mb-4 tracking-tight">TSh 150,000</h3>
+                <div className="flex items-center gap-2 text-brand-blue text-xs md:text-sm font-black">
+                  <Calendar size={14} md:size={16} /> 24 May 2024
                 </div>
               </motion.div>
             </div>
@@ -1146,12 +1173,12 @@ const UserProfile = ({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
-              className="mb-8 bg-emerald-500 p-8 rounded-[3rem] text-white overflow-hidden relative shadow-2xl shadow-emerald-500/20"
+              className="mb-8 bg-emerald-500 p-6 md:p-8 rounded-[2.5rem] md:rounded-[3rem] text-white overflow-hidden relative shadow-2xl shadow-emerald-500/20"
             >
-              <Users className="absolute top-[-10%] right-[-10%] w-48 h-48 text-white/5" />
-              <p className="text-white/60 font-bold uppercase tracking-widest text-[10px] mb-2">{lang === 'sw' ? 'MUALIKE RAFIKI' : 'REFER A FRIEND'}</p>
-              <h3 className="text-xl font-bold mb-2">{lang === 'sw' ? 'Mualike Rafiki, Pata Zawadi' : 'Refer a Friend, Get Rewards'}</h3>
-              <p className="text-xs opacity-80 mb-4">{lang === 'sw' ? 'Shiriki namba yako ya upatanishi na marafiki kupata punguzo la riba.' : 'Share your referral code with friends to get interest discounts.'}</p>
+              <Users className="absolute top-[-10%] right-[-10%] w-32 md:w-48 h-32 md:h-48 text-white/5" />
+              <p className="text-white/60 font-bold uppercase tracking-widest text-[9px] md:text-[10px] mb-2">{lang === 'sw' ? 'MUALIKE RAFIKI' : 'REFER A FRIEND'}</p>
+              <h3 className="text-lg md:text-xl font-bold mb-2">{lang === 'sw' ? 'Mualike Rafiki, Pata Zawadi' : 'Refer a Friend, Get Rewards'}</h3>
+              <p className="text-[10px] md:text-xs opacity-80 mb-4">{lang === 'sw' ? 'Shiriki namba yako ya upatanishi na marafiki kupata punguzo la riba.' : 'Share your referral code with friends to get interest discounts.'}</p>
               <div className="flex items-center gap-2 bg-white/10 p-3 rounded-xl border border-white/20">
                 <code className="flex-1 font-mono font-bold tracking-widest">{user.uid.slice(0, 8).toUpperCase()}</code>
                 <button 
@@ -1170,51 +1197,51 @@ const UserProfile = ({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="bg-white dark:bg-slate-800 rounded-[3rem] p-8 shadow-xl shadow-brand-blue/5 border border-white dark:border-white/5"
+              className="bg-white dark:bg-slate-800 rounded-[2.5rem] md:rounded-[3rem] p-6 md:p-8 shadow-xl shadow-brand-blue/5 border border-white dark:border-white/5"
             >
-              <div className="flex items-center justify-between mb-8">
-                <h3 className="text-xl font-bold text-brand-blue dark:text-white flex items-center gap-3">
-                  <History className="text-brand-gold" /> {t.history}
+              <div className="flex items-center justify-between mb-6 md:mb-8">
+                <h3 className="text-lg md:text-xl font-bold text-brand-blue dark:text-white flex items-center gap-3">
+                  <History size={20} className="text-brand-gold" /> {t.history}
                 </h3>
               </div>
 
               <div className="space-y-4">
                 {applications.length === 0 ? (
-                  <div className="text-center py-16 bg-gray-50 dark:bg-slate-900 rounded-[2rem] border border-dashed border-gray-200 dark:border-white/5">
-                    <AlertCircle className="mx-auto text-gray-200 dark:text-gray-800 mb-4" size={64} />
-                    <p className="text-gray-400 font-bold">{lang === 'sw' ? 'Hujatuma maombi yoyote bado.' : 'No applications found'}</p>
+                  <div className="text-center py-12 md:py-16 bg-gray-50 dark:bg-slate-900 rounded-[2rem] border border-dashed border-gray-200 dark:border-white/5">
+                    <AlertCircle className="mx-auto text-gray-200 dark:text-gray-800 mb-4" size={48} md:size={64} />
+                    <p className="text-xs md:text-sm text-gray-400 font-bold">{lang === 'sw' ? 'Hujatuma maombi yoyote bado.' : 'No applications found'}</p>
                   </div>
                 ) : (
                   applications.slice(0, 10).map((app, i) => (
-                    <div key={app.id || i} className="flex flex-col md:flex-row md:items-center justify-between p-6 rounded-3xl bg-gray-50 dark:bg-slate-900/50 hover:bg-brand-blue/5 dark:hover:bg-brand-blue/10 border border-transparent hover:border-brand-blue/10 transition-all group gap-4">
-                      <div className="flex items-center gap-4">
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${
-                          app.status === 'Approved' ? 'bg-green-100 dark:bg-green-500/10 text-green-600' : 
+                    <div key={app.id || i} className="flex flex-col sm:flex-row sm:items-center justify-between p-5 md:p-6 rounded-3xl bg-gray-50 dark:bg-slate-900/50 hover:bg-brand-blue/5 dark:hover:bg-brand-blue/10 border border-transparent hover:border-brand-blue/10 transition-all group gap-4">
+                      <div className="flex items-center gap-3 md:gap-4">
+                        <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${
+                          app.status === 'Approved' || app.status === 'Disbursed' ? 'bg-green-100 dark:bg-green-500/10 text-green-600' : 
                           app.status === 'Rejected' ? 'bg-red-100 dark:bg-red-500/10 text-red-600' : 'bg-amber-100 dark:bg-amber-500/10 text-amber-600'
                         }`}>
-                          {app.status === 'Approved' ? <CheckCircle2 size={24} /> : 
-                           app.status === 'Rejected' ? <XCircle size={24} /> : <Clock size={24} />}
+                          {(app.status === 'Approved' || app.status === 'Disbursed') ? <CheckCircle2 size={20} md:size={24} /> : 
+                           app.status === 'Rejected' ? <XCircle size={20} md:size={24} /> : <Clock size={20} md:size={24} />}
                         </div>
                         <div>
-                          <p className="font-bold text-brand-blue dark:text-white tracking-tight">{app.loanType || 'General Loan'}</p>
-                          <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">{new Date(app.timestamp).toLocaleDateString()}</p>
+                          <p className="font-bold text-brand-blue dark:text-white tracking-tight text-sm md:text-base">{app.loanType || 'General Loan'}</p>
+                          <p className="text-[9px] md:text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">{new Date(app.timestamp).toLocaleDateString()}</p>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between md:justify-end gap-6">
-                        <div className="text-right">
-                          <p className="font-black text-brand-blue dark:text-white">TSh {Number(app.amount).toLocaleString()}</p>
-                          <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full ${
-                            app.status === 'Approved' ? 'bg-green-500 text-white' : 
+                      <div className="flex items-center justify-between sm:justify-end gap-4 md:gap-6">
+                        <div className="text-left sm:text-right">
+                          <p className="font-black text-brand-blue dark:text-white text-sm md:text-base">TSh {Number(app.amount).toLocaleString()}</p>
+                          <span className={`text-[8px] md:text-[10px] font-black uppercase px-2 md:px-3 py-0.5 md:py-1 rounded-full ${
+                            app.status === 'Approved' || app.status === 'Disbursed' ? 'bg-green-500 text-white' : 
                             app.status === 'Rejected' ? 'bg-red-500 text-white' : 'bg-amber-500 text-white'
                           }`}>
                             {app.status}
                           </span>
                         </div>
                         
-                        {app.status === 'Approved' && (
+                        {(app.status === 'Approved' || app.status === 'Disbursed') && (
                           <button 
                             onClick={() => onRepay(app)}
-                            className="bg-brand-gold text-brand-blue px-4 py-2 rounded-xl font-bold text-xs shadow-lg shadow-brand-gold/20 hover:scale-105 transition-transform"
+                            className="bg-brand-gold text-brand-blue px-3 md:px-4 py-1.5 md:py-2 rounded-xl font-bold text-[10px] md:text-xs shadow-lg shadow-brand-gold/20 hover:scale-105 transition-transform"
                           >
                             {t.repay}
                           </button>
@@ -1277,12 +1304,12 @@ const Hero = ({ lang, users, appConfig }: { lang: Language, users: any[], appCon
           </div>
           
           <h1 className="text-4xl sm:text-6xl md:text-7xl xl:text-8xl font-display font-bold text-white leading-[1.1] md:leading-[1] mb-6 md:mb-8 text-balance">
-            {appConfig.name} <br /> 
+            {lang === 'sw' ? (appConfig.homeTitleSw || appConfig.name) : (appConfig.homeTitleEn || appConfig.name)} <br /> 
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-gold via-yellow-200 to-brand-gold drop-shadow-sm">{t.smile}</span>
           </h1>
           
           <p className="text-base md:text-xl xl:text-2xl text-slate-300 mb-10 max-w-lg mx-auto lg:mx-0 leading-relaxed font-medium">
-            {t.desc}
+            {lang === 'sw' ? (appConfig.homeSubtitleSw || t.desc) : (appConfig.homeSubtitleEn || t.desc)}
           </p>
 
           <div className="flex flex-col sm:flex-row flex-wrap gap-4 md:gap-6 justify-center lg:justify-start">
@@ -1383,6 +1410,68 @@ const Hero = ({ lang, users, appConfig }: { lang: Language, users: any[], appCon
             </motion.div>
           </div>
         </motion.div>
+      </div>
+    </section>
+  );
+};
+
+const AboutUs = ({ lang, appConfig }: { lang: Language, appConfig: AppConfig }) => {
+  const content = lang === 'sw' ? appConfig.aboutContentSw : appConfig.aboutContentEn;
+  const title = lang === 'sw' ? 'Kuhusu Sisi' : 'About Us';
+  
+  if (!content) return null;
+
+  return (
+    <section id="about" className="py-24 bg-white dark:bg-slate-900 border-y border-gray-100 dark:border-white/5">
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="grid lg:grid-cols-2 gap-16 items-center">
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            className="space-y-8"
+          >
+            <div>
+              <span className="text-brand-gold font-black uppercase tracking-[0.3em] text-[10px] mb-4 block">HISTORY & MISSION</span>
+              <h2 className="text-4xl md:text-5xl font-display font-medium text-brand-blue dark:text-white mb-6">
+                {title} <span className="text-brand-gold italic font-serif">Coshve</span>
+              </h2>
+              <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none text-gray-500 dark:text-gray-400 whitespace-pre-line font-medium leading-relaxed">
+                {content}
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-8">
+              <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl">
+                <p className="text-3xl font-display font-black text-brand-blue dark:text-white mb-2">5K+</p>
+                <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">{lang === 'sw' ? 'Wateja' : 'Active Clients'}</p>
+              </div>
+              <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl">
+                <p className="text-3xl font-display font-black text-brand-blue dark:text-white mb-2">24/7</p>
+                <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">{lang === 'sw' ? 'Msaada' : 'Global Support'}</p>
+              </div>
+            </div>
+          </motion.div>
+          
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            className="relative"
+          >
+            <div className="aspect-[4/5] rounded-[3rem] overflow-hidden shadow-2xl shadow-brand-blue/10">
+              <img 
+                src="https://images.unsplash.com/photo-1573164067507-406cd68700ba?auto=format&fit=crop&q=80&w=1000" 
+                className="w-full h-full object-cover"
+                alt="About us"
+              />
+              <div className="absolute inset-0 bg-brand-blue/10 mix-blend-overlay" />
+            </div>
+            {/* Design Accents */}
+            <div className="absolute -bottom-6 -right-6 w-32 h-32 bg-brand-gold/10 rounded-full blur-3xl" />
+            <div className="absolute -top-6 -left-6 w-32 h-32 bg-brand-blue/10 rounded-full blur-3xl" />
+          </motion.div>
+        </div>
       </div>
     </section>
   );
@@ -1927,6 +2016,57 @@ export default function App() {
   const [editingProduct, setEditingProduct] = useState<LoanProduct | null>(null);
   const [isConfigSaving, setIsConfigSaving] = useState(false);
   const [configSaveFeedback, setConfigSaveFeedback] = useState<string | null>(null);
+
+  const analyticsData = useMemo(() => {
+    if (!applications.length) return { statusChart: [], typeChart: [], trendChart: [] };
+
+    // 1. Status Distribution
+    const statusCounts = applications.reduce((acc, app) => {
+      const s = app.status || 'Pending';
+      acc[s] = (acc[s] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const statusChart = [
+      { name: 'Pending', value: statusCounts['Pending'] || 0, color: '#f59e0b' },
+      { name: 'Approved', value: statusCounts['Approved'] || 0, color: '#10b981' },
+      { name: 'Rejected', value: statusCounts['Rejected'] || 0, color: '#f43f5e' },
+      { name: 'Disbursed', value: statusCounts['Disbursed'] || 0, color: '#0A3665' },
+    ].filter(d => d.value > 0);
+
+    // 2. Loan Type Distribution
+    const typeCounts = applications.reduce((acc, app) => {
+      const t = app.loanType || 'General';
+      acc[t] = (acc[t] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const typeChart = Object.entries(typeCounts).map(([name, value]) => ({ name, value }));
+
+    // 3. Trends (Last 7 days)
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      return dateStr;
+    }).reverse();
+
+    const trendChart = last7Days.map(date => {
+      const dayApps = applications.filter(app => {
+        try {
+          return app.timestamp && app.timestamp.split('T')[0] === date;
+        } catch(e) { return false; }
+      });
+      return {
+        date: new Date(date).toLocaleDateString([], { month: 'short', day: 'numeric' }),
+        count: dayApps.length,
+        approved: dayApps.filter(a => a.status === 'Approved' || a.status === 'Disbursed').length
+      };
+    });
+
+    return { statusChart, typeChart, trendChart };
+  }, [applications]);
+
   const [broadcastMessage, setBroadcastMessage] = useState({ title: '', message: '', imageUrl: '', userId: 'all' });
 
   useEffect(() => {
@@ -2248,6 +2388,7 @@ export default function App() {
               exit={{ opacity: 0 }}
             >
               <Hero lang={lang} users={publicUsers} appConfig={appConfig} />
+              <AboutUs lang={lang} appConfig={appConfig} />
               <Services 
                 lang={lang} 
                 loanProducts={loanProducts} 
@@ -2673,7 +2814,7 @@ export default function App() {
                       />
                     </div>
                     <div className="flex bg-gray-100 p-1 rounded-2xl overflow-x-auto no-scrollbar">
-                      {(['loans', 'users', 'products', 'notifs', 'settings'] as const).map((tab) => (
+                      {(['analytics', 'loans', 'users', 'products', 'notifs', 'cms', 'settings'] as const).map((tab) => (
                         <button 
                           key={tab}
                           onClick={() => {
@@ -2718,6 +2859,84 @@ export default function App() {
               <div className="space-y-6">
                 {ADMIN_EMAILS.includes(user?.email || '') ? (
                   <>
+                        {adminTab === 'analytics' && (
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 slide-up">
+                            <div className="lg:col-span-1 app-card dark:bg-slate-900 border-gray-100 dark:border-slate-800 space-y-6">
+                              <div className="flex items-center justify-between">
+                                <h3 className="font-bold text-brand-blue dark:text-white flex items-center gap-2"><TrendingUp size={18} className="text-brand-gold" /> Application Trends</h3>
+                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Last 7 Days</div>
+                              </div>
+                              <div className="h-[300px] w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <AreaChart data={analyticsData.trendChart}>
+                                    <defs>
+                                      <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#0A3665" stopOpacity={0.1}/>
+                                        <stop offset="95%" stopColor="#0A3665" stopOpacity={0}/>
+                                      </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
+                                    <XAxis dataKey="date" fontSize={10} axisLine={false} tickLine={false} />
+                                    <YAxis fontSize={10} axisLine={false} tickLine={false} />
+                                    <Tooltip 
+                                      contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                      itemStyle={{ fontSize: '10px', fontWeight: 'bold' }}
+                                    />
+                                    <Area type="monotone" dataKey="count" name="Total Apps" stroke="#0A3665" strokeWidth={3} fillOpacity={1} fill="url(#colorCount)" />
+                                    <Area type="monotone" dataKey="approved" name="Approved" stroke="#10b981" strokeWidth={2} fill="transparent" />
+                                  </AreaChart>
+                                </ResponsiveContainer>
+                              </div>
+                            </div>
+
+                            <div className="lg:col-span-1 app-card dark:bg-slate-900 border-gray-100 dark:border-slate-800 space-y-6">
+                              <h3 className="font-bold text-brand-blue dark:text-white flex items-center gap-2"><PieChartIcon size={18} className="text-brand-gold" /> Status Distribution</h3>
+                              <div className="h-[300px] w-full flex items-center justify-center">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <PieChart>
+                                    <Pie
+                                      data={analyticsData.statusChart}
+                                      cx="50%"
+                                      cy="50%"
+                                      innerRadius={60}
+                                      outerRadius={100}
+                                      paddingAngle={5}
+                                      dataKey="value"
+                                    >
+                                      {analyticsData.statusChart.map((entry: any, index: number) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                      ))}
+                                    </Pie>
+                                    <Tooltip 
+                                      contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 20px rgba(0,0,0,0.1)' }}
+                                      itemStyle={{ fontSize: '10px', fontWeight: 'bold' }}
+                                    />
+                                    <Legend wrapperStyle={{ fontSize: '10px', fontWeight: 'black', textTransform: 'uppercase' }} />
+                                  </PieChart>
+                                </ResponsiveContainer>
+                              </div>
+                            </div>
+
+                            <div className="lg:col-span-2 app-card dark:bg-slate-900 border-gray-100 dark:border-slate-800 space-y-6">
+                              <h3 className="font-bold text-brand-blue dark:text-white flex items-center gap-2"><BarChart3 size={18} className="text-brand-gold" /> Loan Product Popularity</h3>
+                              <div className="h-[300px] w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <BarChart data={analyticsData.typeChart}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
+                                    <XAxis dataKey="name" fontSize={10} axisLine={false} tickLine={false} />
+                                    <YAxis fontSize={10} axisLine={false} tickLine={false} />
+                                    <Tooltip 
+                                      cursor={{ fill: 'transparent' }}
+                                      contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                      itemStyle={{ fontSize: '10px', fontWeight: 'bold', color: '#0A3665' }}
+                                    />
+                                    <Bar dataKey="value" name="Applications" fill="#0A3665" radius={[10, 10, 0, 0]} barSize={40} />
+                                  </BarChart>
+                                </ResponsiveContainer>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         {adminTab === 'notifs' && (
                           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 slide-up">
                              <div className="md:col-span-12 lg:col-span-5 space-y-6">
@@ -2841,6 +3060,119 @@ export default function App() {
                                    </div>
                                 </div>
                              </div>
+                          </div>
+                        )}
+                        {adminTab === 'cms' && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 slide-up">
+                            <div className="space-y-6">
+                              <div className="app-card dark:bg-slate-900 border-gray-100 dark:border-slate-800 space-y-6">
+                                <h3 className="font-bold text-brand-blue dark:text-white flex items-center gap-2"><LayoutDashboard size={18} className="text-brand-gold" /> Hero Section CMS</h3>
+                                <div className="space-y-4">
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                      <label className="block text-[10px] font-black uppercase text-gray-400">Title (Swahili)</label>
+                                      <input 
+                                        className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-3 text-sm font-bold dark:text-white"
+                                        value={appConfig.homeTitleSw || ''}
+                                        onChange={(e) => setAppConfig({ ...appConfig, homeTitleSw: e.target.value })}
+                                        placeholder={translations.sw.hero.title}
+                                      />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <label className="block text-[10px] font-black uppercase text-gray-400">Title (English)</label>
+                                      <input 
+                                        className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-3 text-sm font-bold dark:text-white"
+                                        value={appConfig.homeTitleEn || ''}
+                                        onChange={(e) => setAppConfig({ ...appConfig, homeTitleEn: e.target.value })}
+                                        placeholder={translations.en.hero.title}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="space-y-2">
+                                    <label className="block text-[10px] font-black uppercase text-gray-400">Subtitle (Swahili)</label>
+                                    <textarea 
+                                      className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-3 text-sm font-bold dark:text-white"
+                                      rows={2}
+                                      value={appConfig.homeSubtitleSw || ''}
+                                      onChange={(e) => setAppConfig({ ...appConfig, homeSubtitleSw: e.target.value })}
+                                      placeholder={translations.sw.hero.desc}
+                                    />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <label className="block text-[10px] font-black uppercase text-gray-400">Subtitle (English)</label>
+                                    <textarea 
+                                      className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-3 text-sm font-bold dark:text-white"
+                                      rows={2}
+                                      value={appConfig.homeSubtitleEn || ''}
+                                      onChange={(e) => setAppConfig({ ...appConfig, homeSubtitleEn: e.target.value })}
+                                      placeholder={translations.en.hero.desc}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="app-card dark:bg-slate-900 border-gray-100 dark:border-slate-800 space-y-6">
+                                <h3 className="font-bold text-brand-blue dark:text-white flex items-center gap-2"><FileText size={18} className="text-brand-gold" /> About Us Content</h3>
+                                <div className="space-y-4">
+                                  <div className="space-y-2">
+                                    <label className="block text-[10px] font-black uppercase text-gray-400">Content (Swahili)</label>
+                                    <textarea 
+                                      className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-3 text-sm font-bold dark:text-white"
+                                      rows={6}
+                                      value={appConfig.aboutContentSw || ''}
+                                      onChange={(e) => setAppConfig({ ...appConfig, aboutContentSw: e.target.value })}
+                                      placeholder="Historia na malengo ya kampuni yetu..."
+                                    />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <label className="block text-[10px] font-black uppercase text-gray-400">Content (English)</label>
+                                    <textarea 
+                                      className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-3 text-sm font-bold dark:text-white"
+                                      rows={6}
+                                      value={appConfig.aboutContentEn || ''}
+                                      onChange={(e) => setAppConfig({ ...appConfig, aboutContentEn: e.target.value })}
+                                      placeholder="Company history and our mission..."
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="space-y-6">
+                              <div className="app-card dark:bg-slate-900 border-gray-100 dark:border-slate-800 space-y-6">
+                                <h3 className="font-bold text-emerald-600 flex items-center gap-2"><History size={18} /> CMS Actions</h3>
+                                <div className="bg-emerald-50 dark:bg-emerald-500/10 p-4 rounded-2xl">
+                                  <p className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase mb-2">Live Preview</p>
+                                  <p className="text-xs text-emerald-600/80">Changes you make here will be immediately visible to all users once saved.</p>
+                                </div>
+                                <button 
+                                  disabled={isConfigSaving}
+                                  onClick={async () => {
+                                    setIsConfigSaving(true);
+                                    setConfigSaveFeedback(null);
+                                    try {
+                                      const { doc, setDoc } = await import('firebase/firestore');
+                                      const { db } = await import('./lib/firebase');
+                                      await setDoc(doc(db, 'appConfig', 'main'), appConfig, { merge: true });
+                                      setConfigSaveFeedback(lang === 'sw' ? 'Maudhui yamehifadhiwa!' : 'CMS Content saved!');
+                                      setTimeout(() => setConfigSaveFeedback(null), 3000);
+                                    } catch (error: any) {
+                                      handleFirestoreError(error, OperationType.WRITE, 'appConfig/main');
+                                      alert(lang === 'sw' ? 'Hitilafu: ' + error.message : 'Error: ' + error.message);
+                                    } finally {
+                                      setIsConfigSaving(false);
+                                    }
+                                  }}
+                                  className={`w-full py-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${isConfigSaving ? 'bg-gray-100 text-gray-400' : 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'}`}
+                                >
+                                  {isConfigSaving ? (
+                                    <><Loader2 className="animate-spin" size={18} /> Inahifadhi...</>
+                                  ) : (
+                                    configSaveFeedback || (lang === 'sw' ? 'Hifadhi Maudhui yote ya CMS' : 'Save all CMS Content')
+                                  )}
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         )}
                         {adminTab === 'settings' && (
@@ -4035,65 +4367,67 @@ export default function App() {
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 20 }}
-              className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[2.5rem] shadow-2xl relative z-10 border border-gray-100 dark:border-slate-800 flex flex-col max-h-[85vh] overflow-hidden"
+              className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[2.5rem] shadow-2xl relative z-10 border border-gray-100 dark:border-slate-800 flex flex-col h-[90vh] md:max-h-[85vh] overflow-hidden"
             >
-              <div className="p-8 border-b border-gray-100 dark:border-slate-800">
-                <div className="flex items-center justify-between mb-8">
-                  <div className="flex items-center gap-6">
-                    <div className="relative">
+              <div className="p-6 md:p-8 border-b border-gray-100 dark:border-slate-800 shrink-0">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4 md:gap-6">
+                    <div className="relative shrink-0">
                       <img 
                         src={selectedAdminUser.photoURL || 'https://api.dicebear.com/7.x/avataaars/svg?seed='+selectedAdminUser.id} 
-                        className="w-24 h-24 rounded-[2.5rem] object-cover ring-4 ring-brand-blue/5 shadow-xl transition-transform hover:scale-105" 
+                        className="w-16 h-16 md:w-24 md:h-24 rounded-[2rem] md:rounded-[2.5rem] object-cover ring-4 ring-brand-blue/5 shadow-xl" 
                         referrerPolicy="no-referrer"
                       />
-                      <div className={`absolute -bottom-2 -right-2 w-8 h-8 rounded-full border-4 border-white dark:border-slate-900 flex items-center justify-center shadow-lg ${selectedAdminUser.isBlocked ? 'bg-rose-500' : 'bg-emerald-500'}`}>
-                        {selectedAdminUser.isBlocked ? <Lock size={14} className="text-white" /> : <CheckCircle size={14} className="text-white" />}
+                      <div className={`absolute -bottom-1 -right-1 w-6 h-6 md:w-8 md:h-8 rounded-full border-4 border-white dark:border-slate-900 flex items-center justify-center shadow-lg ${selectedAdminUser.isBlocked ? 'bg-rose-500' : 'bg-emerald-500'}`}>
+                        {selectedAdminUser.isBlocked ? <Lock size={12} className="text-white" /> : <CheckCircle size={12} className="text-white" />}
                       </div>
                     </div>
-                    <div>
-                      <div className="flex items-center gap-3 mb-1">
-                        <h3 className="text-3xl font-display font-medium text-brand-blue dark:text-white">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <h3 className="text-xl md:text-3xl font-display font-medium text-brand-blue dark:text-white truncate">
                           {selectedAdminUser.fullName || 'Anonymous User'}
                         </h3>
-                        {selectedAdminUser.isAdmin && <span className="bg-brand-gold/10 text-brand-gold text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded">Admin</span>}
+                        {selectedAdminUser.isAdmin && <span className="bg-brand-gold/10 text-brand-gold text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shrink-0">Admin</span>}
                       </div>
-                      <div className="flex flex-wrap gap-3">
-                        <span className="flex items-center gap-2 text-xs text-gray-400 font-bold bg-gray-50 dark:bg-white/5 px-4 py-2 rounded-xl border border-transparent hover:border-brand-blue/10 transition-all cursor-default">
-                          <Mail size={14} className="text-brand-blue/40" /> {selectedAdminUser.email}
+                      <div className="flex flex-col gap-1">
+                        <span className="flex items-center gap-2 text-[10px] md:text-xs text-gray-400 font-bold truncate">
+                          <Mail size={12} className="text-brand-blue/40" /> {selectedAdminUser.email}
                         </span>
-                        <span className="flex items-center gap-2 text-xs text-gray-400 font-bold bg-gray-50 dark:bg-white/5 px-4 py-2 rounded-xl border border-transparent hover:border-brand-blue/10 transition-all cursor-default">
-                          <Smartphone size={14} className="text-brand-blue/40" /> {selectedAdminUser.phone || 'N/A'}
+                        <span className="flex items-center gap-2 text-[10px] md:text-xs text-gray-400 font-bold">
+                          <Smartphone size={12} className="text-brand-blue/40" /> {selectedAdminUser.phone || 'N/A'}
                         </span>
                       </div>
                     </div>
                   </div>
-                  <button onClick={() => setSelectedAdminUser(null)} className="p-4 bg-gray-50 dark:bg-white/5 rounded-2xl text-gray-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-all duration-300">
-                    <X size={24} />
+                  <button onClick={() => setSelectedAdminUser(null)} className="p-3 md:p-4 bg-gray-50 dark:bg-white/5 rounded-2xl text-gray-400 hover:text-rose-500 transition-all">
+                    <X size={20} md:size={24} />
                   </button>
                 </div>
+              </div>
 
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8 custom-scrollbar">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {(() => {
                     const userApps = applications.filter(a => a.userId === selectedAdminUser.id);
-                    const totalBorrowed = userApps.filter(a => a.status === 'Approved').reduce((acc, a) => acc + (a.amount || 0), 0);
+                    const totalBorrowed = userApps.filter(a => a.status === 'Approved' || a.status === 'Disbursed').reduce((acc, a) => acc + (a.amount || 0), 0);
                     const activeLoansCount = userApps.filter(a => a.status === 'Approved').length;
                     return (
                       <>
-                        <div className="p-6 bg-white dark:bg-slate-800/50 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-sm hover:shadow-md transition-all group">
-                          <p className="text-[10px] text-gray-400 font-black tracking-[0.2em] uppercase mb-3">Total Borrowed</p>
-                          <p className="text-2xl font-bold font-display text-brand-blue dark:text-white group-hover:scale-105 transition-transform origin-left">TSh {totalBorrowed.toLocaleString()}</p>
+                        <div className="p-5 md:p-6 bg-white dark:bg-slate-800/50 rounded-[2rem] md:rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-sm">
+                          <p className="text-[9px] text-gray-400 font-black tracking-[0.2em] uppercase mb-2">Total Borrowed</p>
+                          <p className="text-xl md:text-2xl font-bold font-display text-brand-blue dark:text-white">TSh {totalBorrowed.toLocaleString()}</p>
                         </div>
-                        <div className="p-6 bg-amber-50/50 dark:bg-amber-500/10 rounded-[2.5rem] border border-amber-100/50 dark:border-amber-500/10 shadow-sm hover:shadow-md transition-all group">
-                          <p className="text-[10px] text-amber-600/60 font-black tracking-[0.2em] uppercase mb-3">Current Balance</p>
-                          <p className="text-2xl font-bold font-display text-amber-600 group-hover:scale-105 transition-transform origin-left">TSh {totalBorrowed.toLocaleString()}</p>
+                        <div className="p-5 md:p-6 bg-amber-50/50 dark:bg-amber-500/10 rounded-[2rem] md:rounded-[2.5rem] border border-amber-100/50 dark:border-amber-500/10 shadow-sm">
+                          <p className="text-[9px] text-amber-600/60 font-black tracking-[0.2em] uppercase mb-2">Current Balance</p>
+                          <p className="text-xl md:text-2xl font-bold font-display text-amber-600">TSh {totalBorrowed.toLocaleString()}</p>
                         </div>
-                        <div className="p-6 bg-emerald-50/50 dark:bg-emerald-500/10 rounded-[2.5rem] border border-emerald-100/50 dark:border-emerald-500/10 shadow-sm hover:shadow-md transition-all group">
-                          <p className="text-[10px] text-emerald-600/60 font-black tracking-[0.2em] uppercase mb-3">Active Loans</p>
-                          <p className="text-2xl font-bold font-display text-emerald-600 group-hover:scale-105 transition-transform origin-left">{activeLoansCount}</p>
+                        <div className="p-5 md:p-6 bg-emerald-50/50 dark:bg-emerald-500/10 rounded-[2rem] md:rounded-[2.5rem] border border-emerald-100/50 dark:border-emerald-500/10 shadow-sm">
+                          <p className="text-[9px] text-emerald-600/60 font-black tracking-[0.2em] uppercase mb-2">Active Loans</p>
+                          <p className="text-xl md:text-2xl font-bold font-display text-emerald-600">{activeLoansCount}</p>
                         </div>
-                        <div className="p-6 bg-brand-blue/5 rounded-[2.5rem] border border-brand-blue/10 dark:border-brand-blue/20 shadow-sm hover:shadow-md transition-all group">
-                          <p className="text-[10px] text-brand-blue/60 font-black tracking-[0.2em] uppercase mb-3">{lang === 'sw' ? 'Marejesho' : 'Repayment'}</p>
-                          <p className="text-base font-bold font-display text-brand-blue dark:text-white group-hover:scale-105 transition-transform origin-left">
+                        <div className="p-5 md:p-6 bg-brand-blue/5 rounded-[2rem] md:rounded-[2.5rem] border border-brand-blue/10 dark:border-brand-blue/20 shadow-sm">
+                          <p className="text-[9px] text-brand-blue/60 font-black tracking-[0.2em] uppercase mb-2">{lang === 'sw' ? 'Marejesho' : 'Repayment'}</p>
+                          <p className="text-sm md:text-base font-bold font-display text-brand-blue dark:text-white">
                             {userApps.length > 0 
                               ? new Date(new Date(userApps[0].timestamp).getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()
                               : 'N/A'}
@@ -4103,9 +4437,6 @@ export default function App() {
                     )
                   })()}
                 </div>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-8 space-y-8 scrollbar-hide">
                 <div>
                   <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-3">
@@ -4150,41 +4481,43 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="p-8 bg-gray-50/50 dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800 grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="p-4 md:p-8 bg-gray-50/50 dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800 grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 shrink-0">
                 <button 
                   onClick={() => {
                     setAdminTab('notifs');
                     setBroadcastMessage({ ...broadcastMessage, userId: selectedAdminUser.id });
                     setSelectedAdminUser(null);
                   }}
-                  className="py-5 px-4 rounded-[2.5rem] bg-white dark:bg-slate-800 text-brand-blue dark:text-white font-bold text-[11px] uppercase tracking-widest shadow-sm hover:translate-y-[-2px] hover:shadow-md transition-all flex flex-col items-center justify-center gap-3 border border-transparent hover:border-brand-blue/10"
+                  className="py-3 md:py-5 px-3 md:px-4 rounded-[1.5rem] md:rounded-[2.5rem] bg-white dark:bg-slate-800 text-brand-blue dark:text-white font-bold text-[9px] md:text-[11px] uppercase tracking-widest shadow-sm hover:translate-y-[-2px] transition-all flex flex-col items-center justify-center gap-2 md:gap-3 border border-transparent hover:border-brand-blue/10"
                 >
-                  <Bell size={22} className="text-brand-blue/30" /> {lang === 'sw' ? 'Taarifa' : 'Notify'}
+                  <Bell size={18} md:size={22} className="text-brand-blue/30" /> {lang === 'sw' ? 'Taarifa' : 'Notify'}
                 </button>
                 <button 
                   onClick={() => setShowingChat(!showingChat)}
-                  className={`py-5 px-4 rounded-[2.5rem] font-bold text-[11px] uppercase tracking-widest shadow-sm hover:translate-y-[-2px] hover:shadow-md transition-all flex flex-col items-center justify-center gap-3 border border-transparent ${showingChat ? 'bg-brand-gold text-brand-blue border-brand-gold/20' : 'bg-white dark:bg-slate-800 text-gray-500 dark:text-white'}`}
+                  className={`py-3 md:py-5 px-3 md:px-4 rounded-[1.5rem] md:rounded-[2.5rem] font-bold text-[9px] md:text-[11px] uppercase tracking-widest shadow-sm hover:translate-y-[-2px] transition-all flex flex-col items-center justify-center gap-2 md:gap-3 border border-transparent ${showingChat ? 'bg-brand-gold text-brand-blue border-brand-gold/20' : 'bg-white dark:bg-slate-800 text-gray-500 dark:text-white'}`}
                 >
-                  <MessagesSquare size={22} className={showingChat ? 'text-brand-blue/60' : 'text-brand-gold'} /> {lang === 'sw' ? 'Chat' : 'Chat'}
+                  <MessagesSquare size={18} md:size={22} className={showingChat ? 'text-brand-blue/60' : 'text-brand-gold'} /> {lang === 'sw' ? 'Chat' : 'Chat'}
                 </button>
                 <button 
                   onClick={() => downloadPDFStatement(selectedAdminUser, applications.filter(a => a.userId === selectedAdminUser.id), lang, appConfig)}
-                  className="py-5 px-4 rounded-[2.5rem] bg-white dark:bg-slate-800 text-emerald-600 font-bold text-[11px] uppercase tracking-widest shadow-sm hover:translate-y-[-2px] hover:shadow-md transition-all flex flex-col items-center justify-center gap-3 border border-transparent hover:border-emerald-500/10"
+                  className="py-3 md:py-5 px-3 md:px-4 rounded-[1.5rem] md:rounded-[2.5rem] bg-white dark:bg-slate-800 text-emerald-600 font-bold text-[9px] md:text-[11px] uppercase tracking-widest shadow-sm hover:translate-y-[-2px] transition-all flex flex-col items-center justify-center gap-2 md:gap-3 border border-transparent hover:border-emerald-500/10"
                 >
-                  <Download size={22} className="text-emerald-500/30" /> {lang === 'sw' ? 'Resiti' : 'Receipt'}
+                  <Download size={18} md:size={22} className="text-emerald-500/30" /> {lang === 'sw' ? 'Resiti' : 'Receipt'}
                 </button>
                 <button 
                   onClick={async () => {
                     const confirmAction = window.confirm(selectedAdminUser.isBlocked ? 'Unblock user?' : 'Block user?');
                     if (!confirmAction) return;
+                    const { doc, updateDoc } = await import('firebase/firestore');
+                    const { db } = await import('./lib/firebase');
                     await updateDoc(doc(db, 'users', selectedAdminUser.id), { isBlocked: !selectedAdminUser.isBlocked });
                     setSelectedAdminUser({ ...selectedAdminUser, isBlocked: !selectedAdminUser.isBlocked });
                   }}
-                  className={`py-4 rounded-3xl font-bold text-xs shadow-sm hover:translate-y-[-2px] hover:shadow-md transition-all flex flex-col items-center justify-center gap-2 ${
+                  className={`py-3 md:py-4 rounded-[1.5rem] md:rounded-3xl font-bold text-[9px] md:text-xs shadow-sm hover:translate-y-[-2px] transition-all flex flex-col items-center justify-center gap-2 ${
                     selectedAdminUser.isBlocked ? 'bg-amber-500 text-white' : 'bg-white dark:bg-slate-800 text-rose-500'
                   }`}
                 >
-                  <Lock size={20} className={selectedAdminUser.isBlocked ? 'text-white/60' : 'text-rose-500/40'} /> {selectedAdminUser.isBlocked ? 'Unblock' : 'Block'}
+                  <Lock size={18} md:size={20} className={selectedAdminUser.isBlocked ? 'text-white/60' : 'text-rose-500/40'} /> {selectedAdminUser.isBlocked ? 'Unblock' : 'Block'}
                 </button>
               </div>
 
