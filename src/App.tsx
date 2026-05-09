@@ -56,7 +56,8 @@ import {
   MessagesSquare,
   Link as LinkIcon,
   Camera,
-  Image
+  Image,
+  Loader2
 } from 'lucide-react';
 
 interface ChatMessage {
@@ -1924,6 +1925,8 @@ export default function App() {
   const [repayingLoan, setRepayingLoan] = useState<any | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<LoanProduct | null>(null);
   const [editingProduct, setEditingProduct] = useState<LoanProduct | null>(null);
+  const [isConfigSaving, setIsConfigSaving] = useState(false);
+  const [configSaveFeedback, setConfigSaveFeedback] = useState<string | null>(null);
   const [broadcastMessage, setBroadcastMessage] = useState({ title: '', message: '', imageUrl: '', userId: 'all' });
 
   useEffect(() => {
@@ -1942,36 +1945,25 @@ export default function App() {
     }
 
     // Persist to Firebase if Admin
-    if (ADMIN_EMAILS.includes(user?.email || '')) {
-      const saveConfig = async () => {
-        const { doc, setDoc } = await import('firebase/firestore');
-        const { db } = await import('./lib/firebase');
-        await setDoc(doc(db, 'appConfig', 'main'), appConfig, { merge: true });
-      };
-      // We don't want to save on EVERY keystroke necessarily, but for now it's okay for simpler implementation
-      // or we can add a save button in admin settings (preferred)
-    }
-  }, [appConfig, user]);
+    // (Manual save button is now used instead of auto-save to prevent infinite loops and race conditions)
+  }, [appConfig.primaryColor, appConfig.secondaryColor, appConfig.fontFamily, appConfig.themeMode, user]);
 
   useEffect(() => {
-    // Real-time config sync
-    let unsub: () => void;
-    const setupSync = async () => {
+    // Real-time config sync & application data sync logic
+    let unsubConfig: () => void;
+    
+    const startSync = async () => {
       const { doc, onSnapshot } = await import('firebase/firestore');
       const { db } = await import('./lib/firebase');
       
-      unsub = onSnapshot(doc(db, 'appConfig', 'main'), (docSnap: any) => {
-        if (docSnap.exists()) {
-          setAppConfig(docSnap.data() as AppConfig);
-        }
-      }, (error: any) => {
-        console.error("Config sync error:", error);
+      unsubConfig = onSnapshot(doc(db, 'appConfig', 'main'), (snap) => {
+        if (snap.exists()) setAppConfig(snap.data() as AppConfig);
       });
     };
-    setupSync();
     
+    startSync();
     return () => {
-      if (unsub) unsub();
+      unsubConfig?.();
     };
   }, []);
 
@@ -2032,16 +2024,7 @@ export default function App() {
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  useEffect(() => {
-    const fetchConfig = async () => {
-      const { doc, onSnapshot } = await import('firebase/firestore');
-      const { db } = await import('./lib/firebase');
-      return onSnapshot(doc(db, 'appConfig', 'main'), (snap) => {
-        if (snap.exists()) setAppConfig(snap.data() as AppConfig);
-      });
-    };
-    fetchConfig();
-  }, []);
+  // Removed redundant fetchConfig effect as it's now handled in the main sync effect
 
   useEffect(() => {
     let unsubUsers: (() => void) | undefined;
@@ -3027,20 +3010,30 @@ export default function App() {
                                   </div>
                                 </div>
                                 <button 
+                                  disabled={isConfigSaving}
                                   onClick={async () => {
+                                    setIsConfigSaving(true);
+                                    setConfigSaveFeedback(null);
                                     try {
                                       const { doc, setDoc } = await import('firebase/firestore');
                                       const { db } = await import('./lib/firebase');
                                       await setDoc(doc(db, 'appConfig', 'main'), appConfig, { merge: true });
-                                      alert(lang === 'sw' ? 'Mipangilio imehifadhiwa kikamilifu!' : 'Settings saved successfully!');
+                                      setConfigSaveFeedback(lang === 'sw' ? 'Mipangilio imehifadhiwa!' : 'Settings saved!');
+                                      setTimeout(() => setConfigSaveFeedback(null), 3000);
                                     } catch (error: any) {
                                       handleFirestoreError(error, OperationType.WRITE, 'appConfig/main');
                                       alert(lang === 'sw' ? 'Hitilafu: ' + error.message : 'Error: ' + error.message);
+                                    } finally {
+                                      setIsConfigSaving(false);
                                     }
                                   }}
-                                  className="w-full btn-primary py-4 rounded-xl"
+                                  className={`w-full py-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${isConfigSaving ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'btn-primary'}`}
                                 >
-                                  Save Branding Settings
+                                  {isConfigSaving ? (
+                                    <><Loader2 className="animate-spin" size={18} /> {lang === 'sw' ? 'Inahifadhi...' : 'Saving...'}</>
+                                  ) : (
+                                    configSaveFeedback || (lang === 'sw' ? 'Hifadhi Mipangilio ya Brand' : 'Save Branding Settings')
+                                  )}
                                 </button>
                               </div>
                             </div>
@@ -3107,20 +3100,30 @@ export default function App() {
                                     </div>
 
                                     <button 
+                                      disabled={isConfigSaving}
                                       onClick={async () => {
+                                        setIsConfigSaving(true);
+                                        setConfigSaveFeedback(null);
                                         try {
                                           const { doc, setDoc } = await import('firebase/firestore');
                                           const { db } = await import('./lib/firebase');
                                           await setDoc(doc(db, 'appConfig', 'main'), appConfig, { merge: true });
-                                          alert(lang === 'sw' ? 'Mipangilio ya AI imehifadhiwa!' : 'AI Settings saved successfully!');
+                                          setConfigSaveFeedback(lang === 'sw' ? 'Mipangilio ya AI imehifadhiwa!' : 'AI Settings saved!');
+                                          setTimeout(() => setConfigSaveFeedback(null), 3000);
                                         } catch (error: any) {
                                           handleFirestoreError(error, OperationType.WRITE, 'appConfig/main');
                                           alert(lang === 'sw' ? 'Hitilafu: ' + error.message : 'Error: ' + error.message);
+                                        } finally {
+                                          setIsConfigSaving(false);
                                         }
                                       }}
-                                      className="w-full btn-primary py-4 rounded-xl shadow-lg shadow-brand-gold/10"
+                                      className={`w-full py-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 ${isConfigSaving ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'btn-primary shadow-brand-gold/10'}`}
                                     >
-                                      {lang === 'sw' ? 'Hifadhi Mipangilio ya AI' : 'Save AI Settings'}
+                                      {isConfigSaving ? (
+                                        <><Loader2 className="animate-spin" size={18} /> {lang === 'sw' ? 'Inahifadhi...' : 'Saving...'}</>
+                                      ) : (
+                                        configSaveFeedback || (lang === 'sw' ? 'Hifadhi Mipangilio ya AI' : 'Save AI Settings')
+                                      )}
                                     </button>
                                   </div>
                                 </div>
