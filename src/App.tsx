@@ -44,6 +44,7 @@ import {
   Sun,
   Sparkles,
   MessageSquare,
+  Eye,
   Laptop,
   Lock,
   LogOut,
@@ -2491,10 +2492,59 @@ export default function App() {
         if (products.length === 0 && user && ADMIN_EMAILS.includes(user?.email || '')) {
           // Auto-seed for admin if empty
           const defaults = [
-            { icon: 'User', title: 'Personal', color: 'bg-blue-50 text-blue-600' },
-            { icon: 'Home', title: 'House', color: 'bg-emerald-50 text-emerald-600' },
-            { icon: 'Briefcase', title: 'Business', color: 'bg-amber-50 text-amber-600' },
-            { icon: 'Clock', title: 'Emergency', color: 'bg-rose-50 text-rose-600' },
+            { 
+              icon: 'User', 
+              title: 'Personal Loan', 
+              description: lang === 'sw' ? 'Mikopo ya haraka kwa mahitaji binafsi na dharura.' : 'Quick loans for personal needs and emergencies.',
+              color: 'bg-blue-50 text-blue-600',
+              iconType: 'lucide',
+              formFields: [
+                { label: 'Loan Amount', type: 'number', required: true },
+                { label: 'Loan Purpose', type: 'text', required: true },
+                { label: 'Kitambulisho (NIDA/Voters)', type: 'image', required: true },
+                { label: 'Salary Slip / Mabenki Statements', type: 'file', required: true },
+                { label: 'Guarantors Information', type: 'guarantors', required: true }
+              ]
+            },
+            { 
+              icon: 'Briefcase', 
+              title: 'Business Support', 
+              description: lang === 'sw' ? 'Kukuza biashara yako kwa mitaji nafuu.' : 'Grow your business with affordable capital.',
+              color: 'bg-amber-50 text-amber-600',
+              iconType: 'lucide',
+              formFields: [
+                { label: 'Business Name', type: 'text', required: true },
+                { label: 'Loan Amount', type: 'number', required: true },
+                { label: 'Business License (Leseni)', type: 'image', required: true },
+                { label: 'TIN Certificate', type: 'image', required: true },
+                { label: 'Guarantors', type: 'guarantors', required: true }
+              ]
+            },
+            { 
+              icon: 'Home', 
+              title: 'Asset Financing', 
+              description: lang === 'sw' ? 'Mkopo wa kununua vyombo au vifaa vya nyumbani.' : 'Loan for purchasing appliances or home assets.',
+              color: 'bg-emerald-50 text-emerald-600',
+              iconType: 'lucide',
+              formFields: [
+                { label: 'Item Name', type: 'text', required: true },
+                { label: 'Vendor Name', type: 'text', required: true },
+                { label: 'NIDA Card Photo', type: 'image', required: true },
+                { label: 'Salary Slip (Hivi karibuni)', type: 'file', required: true }
+              ]
+            },
+            { 
+              icon: 'Clock', 
+              title: 'Emergency Cash', 
+              description: lang === 'sw' ? 'Pata pesa ndani ya saa 2 kwa dharura.' : 'Get cash within 2 hours for emergencies.',
+              color: 'bg-rose-50 text-rose-600',
+              iconType: 'lucide',
+              formFields: [
+                { label: 'Amount Needed', type: 'number', required: true },
+                { label: 'Emergency Description', type: 'textarea', required: true },
+                { label: 'NIDA ID Copy', type: 'image', required: true }
+              ]
+            },
           ];
           for (const d of defaults) {
             await addDoc(collection(db, 'loanProducts'), d);
@@ -2913,7 +2963,23 @@ export default function App() {
                   <div className="grid grid-cols-1 gap-6">
                     {(selectedProduct?.formFields || []).map((field, i) => (
                       <div key={i} className="space-y-4">
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400">{field.label} {field.required && <span className="text-rose-500">*</span>}</label>
+                        <div className="flex items-center justify-between">
+                          <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400">{field.label} {field.required && <span className="text-rose-500">*</span>}</label>
+                          {(field.label.toLowerCase().includes('nida') || field.label.toLowerCase().includes('kitambulisho') || field.label.toLowerCase().includes('leseni')) && (
+                            <div className="flex items-center gap-1.5 px-2 py-1 bg-brand-gold/10 rounded-lg">
+                              <ShieldCheck size={10} className="text-brand-gold" />
+                              <span className="text-[8px] font-black uppercase text-brand-gold">{lang === 'sw' ? 'Salama' : 'Secure'}</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {(field.label.toLowerCase().includes('nida') || field.label.toLowerCase().includes('salary')) && (
+                          <p className="text-[9px] text-gray-400 italic bg-gray-50 dark:bg-slate-900 p-2 rounded-lg border-l-2 border-brand-gold/30">
+                            {lang === 'sw' 
+                              ? 'Hakikisha picha inaonekana vizuri na taarifa zinasomeka.' 
+                              : 'Ensure the image is clear and information is readable.'}
+                          </p>
+                        )}
                         
                         {field.type === 'textarea' ? (
                           <textarea 
@@ -3769,9 +3835,22 @@ export default function App() {
                                           {v.map((item, idx) => (
                                             <div key={idx}>
                                               {item.type === 'file' ? (
-                                                <a href={item.data} download={item.name || `file_${idx}`} className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg text-brand-blue border border-gray-100">
-                                                  <Paperclip size={12} /> <span className="max-w-[80px] truncate">{item.name || 'File'}</span>
-                                                </a>
+                                                <div className="flex flex-col gap-2">
+                                                  <a href={item.data} download={item.name || `file_${idx}`} className="flex items-center gap-2 bg-gray-50 dark:bg-slate-900 p-2 rounded-lg text-brand-blue dark:text-brand-gold border border-gray-100 dark:border-slate-800 hover:shadow-md transition-all">
+                                                    <Paperclip size={12} /> <span className="max-w-[120px] truncate">{item.name || 'File'}</span>
+                                                  </a>
+                                                  {item.data.startsWith('data:image') && (
+                                                    <button 
+                                                      onClick={() => window.open(item.data)}
+                                                      className="relative w-32 h-20 rounded-lg overflow-hidden border border-gray-100 dark:border-slate-800 shadow-sm group"
+                                                    >
+                                                       <img src={item.data} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+                                                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                          <Eye size={16} className="text-white" />
+                                                       </div>
+                                                    </button>
+                                                  )}
+                                                </div>
                                               ) : (
                                                 <a href={item.data} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-blue-50 p-2 rounded-lg text-brand-blue border border-blue-100">
                                                   <LinkIcon size={12} /> <span className="max-w-[80px] truncate">Link</span>
