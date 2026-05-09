@@ -53,7 +53,10 @@ import {
   ExternalLink,
   Download,
   Share2,
-  MessagesSquare
+  MessagesSquare,
+  Link as LinkIcon,
+  Camera,
+  Image
 } from 'lucide-react';
 
 interface ChatMessage {
@@ -65,6 +68,17 @@ interface ChatMessage {
 }
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from '@google/genai';
+import { 
+  collection, 
+  query, 
+  orderBy, 
+  onSnapshot, 
+  limit, 
+  addDoc, 
+  serverTimestamp, 
+  doc, 
+  updateDoc 
+} from 'firebase/firestore';
 
 import { auth, db } from './lib/firebase';
 import { AuthView } from './components/AuthView';
@@ -74,7 +88,7 @@ type Language = 'sw' | 'en';
 const ADMIN_EMAILS = ['admin@gmail.com', 'amytzee@gmail.com'];
 
 interface Translation {
-  nav: { home: string; services: string; about: string; process: string; apply: string };
+  nav: { home: string; services: string; about: string; process: string; apply: string; login: string; register: string };
   hero: {
     badge: string;
     title: string;
@@ -159,12 +173,14 @@ interface AppConfig {
   address?: string;
   tin?: string;
   vrn?: string;
+  heroGallery?: { url: string; caption: string }[];
 }
 
 interface LoanFormField {
   label: string;
   type: 'text' | 'number' | 'image' | 'file' | 'tel' | 'textarea' | 'location' | 'guarantors';
   required: boolean;
+  multiple?: boolean;
 }
 
 interface Notification {
@@ -186,12 +202,13 @@ interface LoanProduct {
   iconType: 'emoji' | 'lucide' | 'url';
   color: string;
   formFields: LoanFormField[];
+  gallery?: { type: 'file' | 'link', data: string, name?: string }[];
 }
 
 // --- Translations Data ---
 const translations: Record<Language, Translation> = {
   sw: {
-    nav: { home: 'Nyumbani', services: 'Huduma', about: 'Kuhusu', process: 'Mchakato', apply: 'Omba Mkopo' },
+    nav: { home: 'Nyumbani', services: 'Huduma', about: 'Kuhusu', process: 'Mchakato', apply: 'Omba Mkopo', login: 'Ingia', register: 'Jiunge' },
     hero: {
       badge: 'Tier 2 Microfinance • Leseni ya BoT',
       title: 'Tabasamu',
@@ -281,7 +298,7 @@ const translations: Record<Language, Translation> = {
     }
   },
   en: {
-    nav: { home: 'Home', services: 'Services', about: 'About', process: 'Process', apply: 'Apply Now' },
+    nav: { home: 'Home', services: 'Services', about: 'About', process: 'Process', apply: 'Apply Now', login: 'Login', register: 'Sign Up' },
     hero: {
       badge: 'Tier 2 Microfinance • BoT Licensed',
       title: 'Your',
@@ -502,8 +519,6 @@ const SupportChat = ({ lang, user, isAdmin = false, targetUserId }: { lang: Lang
 
   useEffect(() => {
     if (!chatId) return;
-    const { collection, query, orderBy, onSnapshot, limit } = require('firebase/firestore');
-    const { db } = require('./lib/firebase');
 
     const q = query(
       collection(db, 'support_messages', chatId, 'messages'),
@@ -523,9 +538,6 @@ const SupportChat = ({ lang, user, isAdmin = false, targetUserId }: { lang: Lang
     e.preventDefault();
     if (!newMessage.trim() || !chatId) return;
 
-    const { collection, addDoc, serverTimestamp } = require('firebase/firestore');
-    const { db } = require('./lib/firebase');
-
     try {
       await addDoc(collection(db, 'support_messages', chatId, 'messages'), {
         senderId: user.uid,
@@ -540,15 +552,15 @@ const SupportChat = ({ lang, user, isAdmin = false, targetUserId }: { lang: Lang
   };
 
   return (
-    <div className="flex flex-col h-[500px] bg-white dark:bg-slate-900 rounded-[2rem] overflow-hidden border border-gray-100 dark:border-white/5 shadow-2xl">
-      <div className="p-6 bg-brand-blue text-white flex items-center justify-between">
+    <div className={`flex flex-col h-[500px] bg-white dark:bg-slate-900 rounded-[2rem] overflow-hidden border border-gray-100 dark:border-white/5 ${isAdmin ? '' : 'shadow-2xl'}`}>
+      <div className={`p-6 ${isAdmin ? 'bg-slate-800' : 'bg-brand-blue'} text-white flex items-center justify-between`}>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-            <MessageSquare size={20} className="text-brand-gold" />
+          <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-brand-gold">
+            <MessagesSquare size={20} />
           </div>
           <div>
             <h4 className="font-bold text-sm">{lang === 'sw' ? 'Msaada wa Moja kwa Moja' : 'Live Support Chat'}</h4>
-            <p className="text-[10px] opacity-60 font-black uppercase tracking-widest">Online Now</p>
+            <p className="text-[10px] opacity-60 font-black uppercase tracking-widest">{isAdmin ? 'Customer Support' : 'Online Now'}</p>
           </div>
         </div>
       </div>
@@ -570,8 +582,8 @@ const SupportChat = ({ lang, user, isAdmin = false, targetUserId }: { lang: Lang
             <div key={m.id || i} className={`flex ${((isAdmin && m.isAdmin) || (!isAdmin && !m.isAdmin)) ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[80%] p-4 rounded-2xl text-sm ${
                 ((isAdmin && m.isAdmin) || (!isAdmin && !m.isAdmin))
-                  ? 'bg-brand-blue text-white rounded-tr-none shadow-lg shadow-brand-blue/10'
-                  : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-200 rounded-tl-none border border-gray-100 dark:border-white/5'
+                  ? 'bg-brand-blue text-white rounded-tr-none shadow-md shadow-brand-blue/5'
+                  : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-200 rounded-tl-none border border-gray-100 dark:border-white/5 shadow-sm'
               }`}>
                 {m.text}
                 <div className="text-[8px] mt-1 opacity-40 font-black uppercase tracking-tighter">
@@ -591,7 +603,7 @@ const SupportChat = ({ lang, user, isAdmin = false, targetUserId }: { lang: Lang
           placeholder={lang === 'sw' ? 'Andika hapa...' : 'Type here...'}
           className="flex-1 bg-gray-50 dark:bg-white/5 border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-gold transition-all"
         />
-        <button type="submit" className="p-3 bg-brand-gold text-brand-blue rounded-xl hover:scale-105 active:scale-95 transition-all shadow-lg shadow-brand-gold/20">
+        <button type="submit" className="p-3 bg-brand-gold text-brand-blue rounded-xl hover:scale-105 active:scale-95 transition-all shadow-md shadow-brand-gold/10">
           <Send size={20} />
         </button>
       </form>
@@ -724,7 +736,7 @@ const RepaymentModal = ({ lang, loan, onClose }: { lang: Language, loan: any, on
     </motion.div>
   );
 };
-const Navbar = ({ lang, setLang, activeView, setActiveView, user, appConfig, setAppConfig, setShowingSupport, unreadCount, setShowNotifCenter }: { lang: Language, setLang: (l: Language) => void, activeView: string, setActiveView: (v: string) => void, user: any, appConfig: AppConfig, setAppConfig: (c: AppConfig) => void, setShowingSupport: (s: boolean) => void, unreadCount: number, setShowNotifCenter: (n: boolean) => void }) => {
+const Navbar = ({ lang, setLang, activeView, setActiveView, user, appConfig, setAppConfig, setShowingSupport, unreadCount, setShowNotifCenter, onLogin }: { lang: Language, setLang: (l: Language) => void, activeView: string, setActiveView: (v: string) => void, user: any, appConfig: AppConfig, setAppConfig: (c: AppConfig) => void, setShowingSupport: (s: boolean) => void, unreadCount: number, setShowNotifCenter: (n: boolean) => void, onLogin: () => void }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const t = translations[lang].nav;
@@ -823,9 +835,23 @@ const Navbar = ({ lang, setLang, activeView, setActiveView, user, appConfig, set
                   )}
                 </div>
               ) : (
-                <a href="#apply" className="btn-primary py-3 px-6 shadow-brand-blue/30">
-                  {t.apply}
-                </a>
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={onLogin}
+                    className={`font-bold text-sm tracking-tight hover:text-brand-gold transition-colors ${forceSolid ? 'text-brand-blue' : 'text-white'}`}
+                  >
+                    {t.login}
+                  </button>
+                  <button 
+                    onClick={onLogin}
+                    className="bg-brand-gold text-brand-blue py-2.5 px-6 rounded-2xl font-black text-xs hover:bg-white transition-all shadow-xl shadow-brand-gold/20"
+                  >
+                    {t.register}
+                  </button>
+                  <a href="#apply" className="btn-primary py-2.5 px-6 shadow-brand-blue/30 text-xs">
+                    {t.apply}
+                  </a>
+                </div>
               )}
             </div>
 
@@ -855,10 +881,80 @@ const Navbar = ({ lang, setLang, activeView, setActiveView, user, appConfig, set
                   </span>
                 )}
               </button>
+
+              <button 
+                onClick={() => setIsOpen(!isOpen)}
+                className={`p-1.5 rounded-xl ml-1 ${scrolled ? 'text-brand-blue bg-brand-blue/5' : 'text-white bg-white/10'}`}
+              >
+                {isOpen ? <X size={20} /> : <Menu size={20} />}
+              </button>
             </div>
           </div>
         </div>
       </nav>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ opacity: 0, x: '100%' }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: '100%' }}
+            className="fixed inset-0 z-[60] bg-brand-blue p-8 flex flex-col pt-32"
+          >
+            <button onClick={() => setIsOpen(false)} className="absolute top-8 right-8 p-3 bg-white/10 rounded-2xl text-white">
+              <X size={24} />
+            </button>
+
+            <div className="space-y-8">
+              <button 
+                onClick={() => { setActiveView('home'); setIsOpen(false); }}
+                className="block text-4xl font-display font-bold text-white hover:text-brand-gold transition-colors"
+              >{t.home}</button>
+              <button 
+                onClick={() => { setActiveView('services'); setIsOpen(false); }}
+                className="block text-4xl font-display font-bold text-white hover:text-brand-gold transition-colors"
+              >{t.services}</button>
+              <button 
+                onClick={() => { setShowingSupport(true); setIsOpen(false); }}
+                className="block text-4xl font-display font-bold text-white hover:text-brand-gold transition-colors"
+              >{lang === 'sw' ? 'Msaada' : 'Support'}</button>
+              
+              <div className="h-px bg-white/10 w-full" />
+
+              {!user ? (
+                <div className="space-y-4">
+                  <button 
+                    onClick={() => { onLogin(); setIsOpen(false); }}
+                    className="w-full py-5 rounded-2xl border-2 border-white/20 text-white font-bold text-xl"
+                  >
+                    {t.login}
+                  </button>
+                  <button 
+                    onClick={() => { onLogin(); setIsOpen(false); setIsOpen(false); }}
+                    className="w-full py-5 rounded-2xl bg-brand-gold text-brand-blue font-black text-xl"
+                  >
+                    {t.register}
+                  </button>
+                </div>
+              ) : (
+                <button 
+                  onClick={() => { setActiveView('profile'); setIsOpen(false); }}
+                  className="flex items-center gap-4 bg-white/5 p-6 rounded-3xl"
+                >
+                  <img src={user.photoURL || `https://i.pravatar.cc/100?u=${user.uid}`} className="w-16 h-16 rounded-full border-2 border-brand-gold/30" />
+                  <div className="text-left">
+                    <p className="text-white font-bold text-xl">{user.displayName || 'Client'}</p>
+                    <p className="text-brand-gold text-xs font-black uppercase tracking-widest">{lang === 'sw' ? 'Mteja' : 'Client'}</p>
+                  </div>
+                </button>
+              )}
+            </div>
+            <div className="mt-auto opacity-40 text-white text-[10px] font-black uppercase tracking-[0.3em] text-center">
+              Licensed Microfince • BoT
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </>
   );
@@ -955,11 +1051,19 @@ const UserProfile = ({
             >
               <div className="text-center mb-8">
                 <div className="w-32 h-32 rounded-full border-4 border-brand-gold/20 mx-auto mb-4 overflow-hidden p-1 shadow-inner bg-gray-50 dark:bg-slate-900">
-                   <img src={user.photoURL || `https://i.pravatar.cc/200?u=${user.uid}`} className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
+                   <img src={profileData?.photoURL || user.photoURL || `https://i.pravatar.cc/200?u=${user.uid}`} className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
                 </div>
                 <h2 className="text-2xl font-bold text-brand-blue dark:text-white">{profileData?.fullName || user.displayName}</h2>
-                <p className="text-gray-400 font-medium text-sm">{user.email}</p>
-                <div className="mt-4 inline-flex items-center gap-2 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest">
+                <p className="text-gray-400 font-medium text-sm mb-2">{user.email}</p>
+                {profileData?.gender && (
+                  <p className="text-[10px] font-black uppercase tracking-widest text-brand-gold bg-brand-gold/10 px-3 py-1 rounded-full inline-block mb-3">
+                    {profileData.gender === 'male' ? (lang === 'sw' ? 'Mwanaume' : 'Male') : 
+                     profileData.gender === 'female' ? (lang === 'sw' ? 'Mwanamke' : 'Female') : 
+                     (lang === 'sw' ? 'N.k' : 'Other')}
+                  </p>
+                )}
+                <div></div>
+                <div className="mt-2 inline-flex items-center gap-2 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest">
                   <ShieldCheck size={14} /> Verified Account
                 </div>
               </div>
@@ -1130,7 +1234,7 @@ const Hero = ({ lang, users, appConfig }: { lang: Language, users: any[], appCon
   const t = translations[lang].hero;
   
   // Themed images inspired by user posters
-  const heroImages = [
+  const heroImages = appConfig.heroGallery && appConfig.heroGallery.length > 0 ? appConfig.heroGallery : [
     {
       url: "https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&q=80&w=1200", 
       caption: lang === 'sw' ? 'Stress za kodi? Sasa Basi!' : 'No more rent stress!'
@@ -1287,21 +1391,19 @@ const Hero = ({ lang, users, appConfig }: { lang: Language, users: any[], appCon
 const Services = ({ lang, loanProducts, onSelect }: { lang: Language, loanProducts: LoanProduct[], onSelect: (p: LoanProduct) => void }) => {
   const t = translations[lang].services;
   return (
-    <section id="services" className="py-20 md:py-32 bg-slate-50">
-      <div className="max-w-7xl mx-auto px-4 md:px-6">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end mb-12 md:mb-20 gap-6 md:gap-8">
-          <div className="max-w-xl">
-            <span className="text-brand-blue font-black uppercase tracking-widest text-xs md:text-sm mb-3 md:mb-4 block">{lang === 'sw' ? 'Huduma Zetu' : 'Our Services'}</span>
-            <h2 className="text-3xl md:text-5xl lg:text-6xl font-display font-bold text-brand-blue leading-tight">
-              {t.title} <span className="text-brand-gold">{t.accent}</span>
-            </h2>
-          </div>
-          <p className="text-slate-500 text-base md:text-lg max-w-md font-medium leading-relaxed">
+    <section id="services" className="py-24 bg-gray-50 dark:bg-slate-950 transition-colors">
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="text-center mb-16 md:mb-24">
+          <span className="text-brand-gold font-black uppercase tracking-[0.3em] text-[10px] md:text-xs mb-4 block">{lang === 'sw' ? 'CHAGUA HUDUMA' : 'SELECT SERVICE'}</span>
+          <h2 className="text-4xl md:text-5xl lg:text-7xl font-display font-medium text-brand-blue dark:text-white mb-6">
+            {t.title} <span className="text-brand-gold italic font-serif">{t.accent}</span>
+          </h2>
+          <p className="max-w-2xl mx-auto text-gray-500 dark:text-gray-400 text-base md:text-lg leading-relaxed">
             {t.desc}
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
           {loanProducts.map((p, idx) => {
             const IconMap: Record<string, any> = { User, Home, Briefcase, GraduationCap, Wallet, HandCoins, Building2, Clock };
             const IconComponent = IconMap[p.icon] || Briefcase;
@@ -1309,48 +1411,43 @@ const Services = ({ lang, loanProducts, onSelect }: { lang: Language, loanProduc
             return (
               <motion.div 
                 key={p.id || idx}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: idx * 0.1 }}
-                whileHover={{ y: -8, transition: { duration: 0.3 } }}
-                className="group relative h-full flex flex-col p-8 md:p-10 bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 hover:border-brand-gold/30 transition-all duration-500 shadow-xl shadow-slate-200/50 dark:shadow-none hover:shadow-2xl hover:shadow-brand-gold/10"
+                transition={{ delay: idx * 0.1, duration: 0.6 }}
+                whileHover={{ scale: 1.02, transition: { duration: 0.3 } }}
+                className="group relative bg-[#0F141F] rounded-[2.5rem] md:rounded-[3.5rem] p-8 md:p-16 flex flex-col items-center justify-center text-center border border-white/5 shadow-2xl overflow-hidden cursor-pointer"
+                onClick={() => onSelect(p)}
               >
-                {/* Decorative Pattern */}
-                <div className="absolute top-0 right-0 w-32 h-32 bg-brand-gold/5 rounded-bl-full -mr-10 -mt-10 group-hover:scale-110 transition-transform duration-700 opacity-0 group-hover:opacity-100" />
+                {/* Background Glow */}
+                <div className="absolute -inset-1 bg-gradient-to-tr from-brand-gold/0 via-brand-gold/0 to-brand-gold/10 opacity-0 group-hover:opacity-100 transition-opacity blur-2xl" />
                 
-                <div className="flex items-start justify-between mb-10 relative z-10">
-                   <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-3xl ${p.color} shadow-inner-white ring-8 ring-white/50 dark:ring-slate-800/50 group-hover:rotate-6 transition-transform duration-500`}>
-                      {p.iconType === 'emoji' ? p.icon : (p.iconType === 'url' ? <img src={p.icon} className="w-10 h-10 object-contain" /> : <IconComponent size={32} strokeWidth={1.5} />)}
-                   </div>
-                   <div className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-gold py-1 px-3 bg-brand-gold/5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                     {lang === 'sw' ? 'Mkopo Bora' : 'Top Choice'}
-                   </div>
+                {/* Icon Container (Themed like the image) */}
+                <div className="mb-8 md:mb-12 relative">
+                  <div className="w-24 h-24 md:w-32 md:h-32 bg-white/95 dark:bg-white rounded-[2rem] md:rounded-[2.5rem] flex items-center justify-center shadow-[0_20px_50px_rgba(0,0,0,0.3)] border-4 border-slate-200/40 relative z-10 group-hover:scale-105 transition-transform duration-500">
+                    {p.iconType === 'emoji' ? (
+                      <span className="text-4xl md:text-5xl drop-shadow-sm">{p.icon}</span>
+                    ) : p.iconType === 'url' ? (
+                      <img src={p.icon} className="w-16 h-16 md:w-20 md:h-20 object-contain drop-shadow-md" />
+                    ) : (
+                      <IconComponent size={48} strokeWidth={1} className="text-brand-blue" />
+                    )}
+                  </div>
+                  {/* Subtle holder ring */}
+                  <div className="absolute inset-0 -m-3 rounded-[2.5rem] md:rounded-[3rem] border border-white/10 group-hover:border-white/20 transition-colors" />
                 </div>
                 
-                <h3 className="text-2xl md:text-3xl font-display font-bold text-brand-blue dark:text-white mb-4 group-hover:text-brand-gold transition-colors leading-tight">
-                  {p.title} <span className="font-serif italic font-normal text-brand-gold/60">{lang === 'sw' ? 'Mkopo' : 'Loan'}</span>
+                <h3 className="text-2xl md:text-4xl font-serif font-bold text-white mb-2 md:mb-4 group-hover:text-brand-gold transition-colors tracking-tight">
+                  {p.title}
                 </h3>
                 
-                <p className="text-slate-500 dark:text-slate-400 text-sm md:text-base leading-relaxed mb-auto pb-10">
-                  {p.description || translations[lang].hero.desc}
-                </p>
+                <div className="text-[10px] md:text-xs font-black uppercase tracking-[0.25em] text-gray-400 group-hover:text-white transition-all transform origin-center">
+                  {lang === 'sw' ? 'OMBA SASA' : 'APPLY NOW'}
+                </div>
 
-                <div className="pt-6 border-t border-slate-50 dark:border-slate-800/50">
-                  <button 
-                    onClick={() => onSelect(p)}
-                    className="flex items-center gap-3 font-black text-xs uppercase tracking-widest text-brand-blue dark:text-white group-hover:text-brand-gold transition-all"
-                  >
-                    <span className="relative overflow-hidden group/btn">
-                      <span className="block group-hover/btn:-translate-y-full transition-transform duration-300">
-                        {lang === 'sw' ? 'Omba Sasa' : 'Apply Now'}
-                      </span>
-                      <span className="absolute top-0 left-0 block translate-y-full group-hover/btn:translate-y-0 transition-transform duration-300 text-brand-gold">
-                        {lang === 'sw' ? 'Anza Maombi' : 'Get Started'}
-                      </span>
-                    </span>
-                    <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform duration-300" />
-                  </button>
+                {/* Hover Indicator */}
+                <div className="absolute bottom-6 opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0">
+                  <div className="w-12 h-1 bg-brand-gold rounded-full" />
                 </div>
               </motion.div>
             );
@@ -1638,7 +1735,7 @@ const FAQ = ({ lang }: { lang: Language }) => {
 };
 
 // --- Footer ---
-const Footer = ({ lang, appConfig }: { lang: Language, appConfig: AppConfig }) => {
+const Footer = ({ lang, appConfig, user, setActiveView }: { lang: Language, appConfig: AppConfig, user: any, setActiveView: (view: string) => void }) => {
   return (
     <footer className="bg-brand-dark text-white pt-24 pb-12 md:pb-16 overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 md:px-6 relative">
@@ -1674,9 +1771,9 @@ const Footer = ({ lang, appConfig }: { lang: Language, appConfig: AppConfig }) =
             <div>
               <h4 className="text-[10px] font-black uppercase tracking-[0.2em] md:tracking-[0.3em] text-brand-gold mb-8 md:mb-10">{lang === 'sw' ? 'Kampuni' : 'Company'}</h4>
               <ul className="space-y-4 md:space-y-6 text-slate-400 font-bold text-sm md:text-base">
-                <li><a href="#home" className="hover:text-white transition-colors">{translations[lang].nav.home}</a></li>
-                <li><a href="#services" className="hover:text-white transition-colors">{translations[lang].nav.services}</a></li>
-                <li><a href="#process" className="hover:text-white transition-colors">{translations[lang].nav.process}</a></li>
+                <li><button onClick={() => setActiveView('home')} className="hover:text-white transition-colors">{translations[lang].nav.home}</button></li>
+                <li><button onClick={() => setActiveView('services')} className="hover:text-white transition-colors">{translations[lang].nav.services}</button></li>
+                {!user && <li><button onClick={() => setActiveView('auth')} className="hover:text-white transition-colors">{translations[lang].nav.login}</button></li>}
               </ul>
             </div>
             <div>
@@ -1750,6 +1847,16 @@ const handleFirestoreError = (error: any, operationType: OperationType, path: st
   throw new Error(JSON.stringify(errInfo));
 };
 
+// Helper function to convert File to Base64
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = error => reject(error);
+  });
+};
+
 export default function App() {
   const [lang, setLang] = useState<Language>('sw');
   const [activeView, setActiveView] = useState('home');
@@ -1777,6 +1884,28 @@ export default function App() {
     vrn: '40012345X'
   });
   const [calcAmount, setCalcAmount] = useState<number>(0);
+  const [formAttachments, setFormAttachments] = useState<Record<string, { type: 'file' | 'link', id: string, value: string, preview?: string }[]>>({});
+
+  const addAttachmentSlot = (fieldLabel: string) => {
+    setFormAttachments(prev => ({
+      ...prev,
+      [fieldLabel]: [...(prev[fieldLabel] || []), { type: 'file', id: Math.random().toString(36).slice(2), value: '' }]
+    }));
+  };
+
+  const removeAttachmentSlot = (fieldLabel: string, id: string) => {
+    setFormAttachments(prev => ({
+      ...prev,
+      [fieldLabel]: (prev[fieldLabel] || []).filter(a => a.id !== id)
+    }));
+  };
+
+  const updateAttachment = (fieldLabel: string, id: string, updates: any) => {
+    setFormAttachments(prev => ({
+      ...prev,
+      [fieldLabel]: (prev[fieldLabel] || []).map(a => a.id === id ? { ...a, ...updates } : a)
+    }));
+  };
   const [showAiAssistant, setShowAiAssistant] = useState(false);
   const [aiHistory, setAiHistory] = useState<{role: 'user' | 'model', parts: {text: string}[]}[]>([]);
   const [isAiLoading, setIsAiLoading] = useState(false);
@@ -1786,7 +1915,7 @@ export default function App() {
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [isDeletingUser, setIsDeletingUser] = useState<any | null>(null);
   const [selectedAdminUser, setSelectedAdminUser] = useState<any | null>(null);
-  const [editForm, setEditForm] = useState({ phone: '', fullName: '' });
+  const [editForm, setEditForm] = useState({ phone: '', fullName: '', gender: '', photoURL: '' });
   const [passwordForm, setPasswordForm] = useState({ current: '', new: '' });
   const [adminTab, setAdminTab] = useState<'loans' | 'users' | 'products' | 'settings' | 'notifs'>('loans');
   const [searchTerm, setSearchTerm] = useState('');
@@ -2070,6 +2199,7 @@ export default function App() {
         setShowingSupport={setShowingSupport}
         unreadCount={unreadCount}
         setShowNotifCenter={setShowNotifCenter}
+        onLogin={() => setActiveView('auth')}
       />
 
       {/* Notification Center Popover */}
@@ -2166,7 +2296,12 @@ export default function App() {
                 applications={applications} 
                 notifications={notifications}
                 onEdit={() => {
-                  setEditForm({ phone: profileData?.phone || '', fullName: user?.displayName || profileData?.fullName || '' });
+                  setEditForm({ 
+                    phone: profileData?.phone || '', 
+                    fullName: user?.displayName || profileData?.fullName || '',
+                    gender: profileData?.gender || '',
+                    photoURL: profileData?.photoURL || user?.photoURL || ''
+                  });
                   setEditingProfile(true);
                 }}
                 onChangePassword={() => setChangingPassword(true)}
@@ -2183,6 +2318,28 @@ export default function App() {
                 showingChat={showingChat}
                 appConfig={appConfig}
               />
+            </motion.div>
+          )}
+
+          {activeView === 'auth' && !user && (
+            <motion.div
+              key="auth"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="max-w-4xl mx-auto px-4 py-12"
+            >
+              <AuthView lang={lang} onSuccess={() => setActiveView('profile')} />
+              <div className="mt-8 text-center">
+                 <p className="text-gray-400 text-sm mb-4">{lang === 'sw' ? 'Au tumia mtandao wako' : 'Or use your social account'}</p>
+                 <button 
+                  onClick={handleLogin}
+                  className="bg-white border border-gray-200 text-gray-700 px-8 py-3 rounded-2xl font-bold flex items-center justify-center gap-3 mx-auto hover:bg-gray-50 transition-all shadow-sm"
+                >
+                  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/smartlock/google.svg" className="w-5 h-5" />
+                  {lang === 'sw' ? 'Ingia na Google' : 'Sign in with Google'}
+                </button>
+              </div>
             </motion.div>
           )}
 
@@ -2259,6 +2416,20 @@ export default function App() {
                   </div>
                 </div>
 
+                {selectedProduct?.gallery && selectedProduct.gallery.length > 0 && (
+                  <div className="flex gap-3 overflow-x-auto pb-4 mb-2 custom-scrollbar no-scrollbar">
+                    {selectedProduct.gallery.map((img, i) => (
+                      <div key={i} className="flex-shrink-0 w-48 h-32 rounded-3xl overflow-hidden border border-gray-100 dark:border-slate-800 shadow-sm bg-gray-50 dark:bg-slate-900 group">
+                        <img 
+                          src={img.data} 
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                          referrerPolicy="no-referrer" 
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {/* Loan Calculator */}
                 <div className="bg-brand-blue/5 dark:bg-slate-800/50 p-6 rounded-[2rem] border border-brand-blue/10 slide-up">
                   <div className="flex items-center gap-3 mb-6">
@@ -2298,30 +2469,36 @@ export default function App() {
                 <form className="space-y-6" onSubmit={async (e) => {
                   e.preventDefault();
                   if (!user) {
-                    alert('Please sign in first');
-                    setActiveView('profile');
+                    alert(lang === 'sw' ? 'Tafadhali ingia kwanza' : 'Please sign in first');
+                    setActiveView('auth');
                     return;
                   }
                   
                   const formData = new FormData(e.currentTarget);
                   const data: any = {};
                   
-                  // Helper function to convert File to Base64
-                  const fileToBase64 = (file: File): Promise<string> => {
-                    return new Promise((resolve, reject) => {
-                      const reader = new FileReader();
-                      reader.readAsDataURL(file);
-                      reader.onload = () => resolve(reader.result as string);
-                      reader.onerror = error => reject(error);
-                    });
-                  };
-
                   for (const f of (selectedProduct?.formFields || [])) {
                     if (f.type === 'file' || f.type === 'image') {
-                      const file = formData.get(f.label) as File;
-                      if (file && file.size > 0) {
-                        data[f.label] = await fileToBase64(file);
+                      const attachments = formAttachments[f.label] || [{ type: 'file', id: 'initial', value: '' }];
+                      const attachmentData = [];
+                      
+                      for (const a of attachments) {
+                        if (a.type === 'file') {
+                          const fileInput = formData.get(`${f.label}_file_${a.id}`) as File;
+                          if (fileInput && fileInput.size > 0) {
+                            const b64 = await fileToBase64(fileInput);
+                            attachmentData.push({ type: 'file', data: b64, name: fileInput.name });
+                          } else if (a.preview) {
+                             attachmentData.push({ type: 'file', data: a.preview });
+                          }
+                        } else {
+                          const link = formData.get(`${f.label}_link_${a.id}`) as string;
+                          if (link) {
+                            attachmentData.push({ type: 'link', data: link });
+                          }
+                        }
                       }
+                      data[f.label] = attachmentData;
                     } else if (f.type === 'guarantors') {
                       data[f.label] = {
                         name1: formData.get(`${f.label}_name1`),
@@ -2370,18 +2547,80 @@ export default function App() {
                             className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 font-bold text-sm focus:ring-2 focus:ring-brand-blue/10 outline-none"
                           />
                         ) : field.type === 'file' || field.type === 'image' ? (
-                          <div className="relative">
-                            <input 
-                              type="file"
-                              name={field.label}
-                              required={field.required}
-                              accept={field.type === 'image' ? 'image/*' : '*/*'}
-                              className="w-full bg-gray-50 border-none rounded-2xl py-8 px-6 font-bold text-sm text-center border-2 border-dashed border-gray-200"
-                            />
-                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-gray-400 gap-2">
-                               <Paperclip size={18} />
-                               <span className="text-xs">Click to upload documets</span>
-                            </div>
+                          <div className="space-y-4">
+                            {(formAttachments[field.label] || [{ type: 'file', id: 'initial', value: '' }]).map((attachment, idx) => (
+                              <div key={attachment.id} className="relative bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-800 p-4 rounded-2xl space-y-3">
+                                <div className="flex items-center justify-between gap-4">
+                                  <div className="flex bg-white dark:bg-slate-800 p-1 rounded-xl shadow-sm">
+                                    <button 
+                                      type="button"
+                                      onClick={() => updateAttachment(field.label, attachment.id, { type: 'file' })}
+                                      className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${attachment.type === 'file' ? 'bg-brand-blue text-white' : 'text-gray-400'}`}
+                                    >Upload</button>
+                                    <button 
+                                      type="button"
+                                      onClick={() => updateAttachment(field.label, attachment.id, { type: 'link' })}
+                                      className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${attachment.type === 'link' ? 'bg-brand-blue text-white' : 'text-gray-400'}`}
+                                    >Link</button>
+                                  </div>
+                                  {field.multiple && idx > 0 && (
+                                    <button 
+                                      type="button"
+                                      onClick={() => removeAttachmentSlot(field.label, attachment.id)}
+                                      className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                                    ><X size={14} /></button>
+                                  )}
+                                </div>
+                                
+                                {attachment.type === 'file' ? (
+                                  <div className="relative group">
+                                    <input 
+                                      type="file"
+                                      name={`${field.label}_file_${attachment.id}`}
+                                      required={field.required && idx === 0}
+                                      accept={field.type === 'image' ? 'image/*' : '*/*'}
+                                      className="w-full h-16 opacity-0 absolute inset-0 cursor-pointer z-10"
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                          const reader = new FileReader();
+                                          reader.onload = () => updateAttachment(field.label, attachment.id, { preview: reader.result as string, value: 'file_selected' });
+                                          reader.readAsDataURL(file);
+                                        }
+                                      }}
+                                    />
+                                    <div className="flex items-center justify-center h-16 border-2 border-dashed border-gray-200 dark:border-slate-700 rounded-xl text-gray-400 gap-2 group-hover:border-brand-blue/30 transition-colors">
+                                      {attachment.preview ? (
+                                        <img src={attachment.preview} className="w-full h-full object-cover rounded-xl" />
+                                      ) : (
+                                        <>
+                                          <Paperclip size={14} />
+                                          <span className="text-[10px] font-bold uppercase tracking-widest">{lang === 'sw' ? 'Gusa Kupakia' : 'Click to Upload'}</span>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <input 
+                                    name={`${field.label}_link_${attachment.id}`}
+                                    type="url"
+                                    placeholder="https://example.com/picha.jpg"
+                                    required={field.required && idx === 0}
+                                    className="w-full bg-white dark:bg-slate-800 border-none rounded-xl py-3 px-4 text-xs font-bold focus:ring-1 focus:ring-brand-blue outline-none"
+                                    onChange={(e) => updateAttachment(field.label, attachment.id, { value: e.target.value })}
+                                  />
+                                )}
+                              </div>
+                            ))}
+                            {field.multiple && (
+                              <button 
+                                type="button"
+                                onClick={() => addAttachmentSlot(field.label)}
+                                className="w-full py-3 border-2 border-dashed border-brand-blue/20 rounded-2xl text-[10px] font-black uppercase tracking-widest text-brand-blue hover:bg-brand-blue/5 transition-all"
+                              >
+                                + {lang === 'sw' ? 'Ongeza Picha nyingine' : 'Add Another Attachment'}
+                              </button>
+                            )}
                           </div>
                         ) : field.type === 'guarantors' ? (
                           <div className="space-y-4 bg-gray-50 p-6 rounded-3xl border border-gray-100">
@@ -2719,6 +2958,74 @@ export default function App() {
                                     <option value="system-ui">System Default</option>
                                   </select>
                                 </div>
+                                <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-slate-800">
+                                  <div className="flex items-center justify-between">
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400">Hero Slideshow</label>
+                                    <button 
+                                      onClick={() => setAppConfig({
+                                        ...appConfig,
+                                        heroGallery: [...(appConfig.heroGallery || []), { url: '', caption: '' }]
+                                      })}
+                                      className="text-[10px] font-bold text-brand-blue bg-blue-50 dark:bg-slate-800 px-3 py-1 rounded-lg"
+                                    >+ Add Slide</button>
+                                  </div>
+                                  <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                                    {(appConfig.heroGallery || []).map((slide, sIdx) => (
+                                      <div key={sIdx} className="bg-gray-50 dark:bg-slate-800/50 p-3 rounded-xl border border-gray-100 dark:border-slate-700/50 space-y-3">
+                                        <div className="flex items-center gap-3">
+                                          <div className="w-12 h-12 rounded-lg bg-white dark:bg-slate-700 overflow-hidden flex-shrink-0 border border-gray-100 dark:border-slate-600">
+                                            {slide.url ? <img src={slide.url} className="w-full h-full object-cover" /> : <Image size={20} className="text-gray-300 m-auto" />}
+                                          </div>
+                                          <div className="flex-1 space-y-2">
+                                            <div className="flex items-center gap-2">
+                                              <input 
+                                                type="file" 
+                                                accept="image/*"
+                                                className="text-[9px] block w-full text-gray-500 file:mr-2 file:py-0.5 file:px-2 file:rounded-full file:border-0 file:text-[9px] file:font-semibold file:bg-blue-50 file:text-brand-blue hover:file:bg-blue-100 cursor-pointer"
+                                                onChange={async (e) => {
+                                                  const file = e.target.files?.[0];
+                                                  if (file) {
+                                                    const b64 = await fileToBase64(file);
+                                                    const newHero = [...(appConfig.heroGallery || [])];
+                                                    newHero[sIdx].url = b64;
+                                                    setAppConfig({...appConfig, heroGallery: newHero});
+                                                  }
+                                                }}
+                                              />
+                                              <button 
+                                                onClick={() => {
+                                                  const newHero = (appConfig.heroGallery || []).filter((_, i) => i !== sIdx);
+                                                  setAppConfig({...appConfig, heroGallery: newHero});
+                                                }}
+                                                className="text-rose-500 p-1"
+                                              ><X size={14} /></button>
+                                            </div>
+                                            <input 
+                                              className="w-full bg-white dark:bg-slate-900 border-none rounded-lg p-2 text-[10px] font-bold"
+                                              placeholder="Image Link (optional if uploaded)"
+                                              value={slide.url.startsWith('data:') ? '' : slide.url}
+                                              onChange={(e) => {
+                                                const newHero = [...(appConfig.heroGallery || [])];
+                                                newHero[sIdx].url = e.target.value;
+                                                setAppConfig({...appConfig, heroGallery: newHero});
+                                              }}
+                                            />
+                                          </div>
+                                        </div>
+                                        <input 
+                                          className="w-full bg-white dark:bg-slate-900 border-none rounded-lg p-2 text-[10px] font-bold"
+                                          placeholder="Slide Caption"
+                                          value={slide.caption}
+                                          onChange={(e) => {
+                                            const newHero = [...(appConfig.heroGallery || [])];
+                                            newHero[sIdx].caption = e.target.value;
+                                            setAppConfig({...appConfig, heroGallery: newHero});
+                                          }}
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
                                 <button 
                                   onClick={async () => {
                                     try {
@@ -2840,9 +3147,25 @@ export default function App() {
                                   {Object.entries(loan.customData || {}).map(([k, v]: [any, any]) => (
                                     <div key={k} className="text-[10px] text-gray-500 border-l-2 border-gray-100 pl-2">
                                       <span className="font-bold capitalize text-brand-blue block mb-1">{k}:</span>
-                                      {typeof v === 'object' ? (
+                                      {Array.isArray(v) ? (
+                                        <div className="flex flex-wrap gap-2 mt-1">
+                                          {v.map((item, idx) => (
+                                            <div key={idx}>
+                                              {item.type === 'file' ? (
+                                                <a href={item.data} download={item.name || `file_${idx}`} className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg text-brand-blue border border-gray-100">
+                                                  <Paperclip size={12} /> <span className="max-w-[80px] truncate">{item.name || 'File'}</span>
+                                                </a>
+                                              ) : (
+                                                <a href={item.data} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-blue-50 p-2 rounded-lg text-brand-blue border border-blue-100">
+                                                  <LinkIcon size={12} /> <span className="max-w-[80px] truncate">Link</span>
+                                                </a>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : typeof v === 'object' ? (
                                         <div className="grid grid-cols-2 gap-2 bg-gray-50 p-2 rounded-lg">
-                                          {Object.entries(v).map(([subK, subV]: [any, any]) => (
+                                          {Object.entries(v || {}).map(([subK, subV]: [any, any]) => (
                                             <p key={subK}><span className="capitalize opacity-60">{subK}:</span> {subV}</p>
                                           ))}
                                         </div>
@@ -2990,12 +3313,134 @@ export default function App() {
                                  />
                                </div>
                                <div className="space-y-4">
-                                 <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400">Icon (Emoji/URL/Lucide Name)</label>
-                                 <input 
-                                  className="w-full bg-gray-50 border-none rounded-xl p-4 font-bold text-sm" 
-                                  value={editingProduct.icon}
-                                  onChange={(e) => setEditingProduct({...editingProduct, icon: e.target.value, iconType: e.target.value.includes('http') ? 'url' : (e.target.value.length > 2 ? 'lucide' : 'emoji')})}
-                                 />
+                                 <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400">Icon / Primary Image</label>
+                                 <div className="flex bg-gray-100 dark:bg-slate-800 p-1 rounded-xl w-fit mb-2">
+                                   {(['emoji', 'url', 'lucide'] as const).map(type => (
+                                     <button 
+                                       key={type}
+                                       type="button"
+                                       onClick={() => setEditingProduct({...editingProduct, iconType: type})}
+                                       className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all capitalize ${editingProduct.iconType === type ? 'bg-brand-blue text-white' : 'text-gray-400'}`}
+                                     >{type}</button>
+                                   ))}
+                                 </div>
+                                 
+                                 {editingProduct.iconType === 'url' ? (
+                                   <div className="flex items-center gap-4">
+                                      <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 flex items-center justify-center overflow-hidden border border-gray-100 dark:border-slate-700">
+                                        {editingProduct.icon ? <img src={editingProduct.icon} className="w-full h-full object-cover" /> : <Paperclip className="text-gray-300" />}
+                                      </div>
+                                      <div className="flex-1 space-y-2">
+                                         <input 
+                                           type="file" 
+                                           accept="image/*"
+                                           className="text-[10px] block w-full text-gray-500 file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-semibold file:bg-blue-50 file:text-brand-blue hover:file:bg-blue-100 cursor-pointer"
+                                           onChange={async (e) => {
+                                             const file = e.target.files?.[0];
+                                             if (file) {
+                                               const b64 = await fileToBase64(file);
+                                               setEditingProduct({...editingProduct, icon: b64});
+                                             }
+                                           }}
+                                         />
+                                         <input 
+                                           className="w-full bg-gray-50 dark:bg-slate-900 border-none rounded-xl p-3 text-xs font-bold" 
+                                           placeholder="Or paste link here..."
+                                           value={editingProduct.icon.startsWith('data:') ? '' : editingProduct.icon}
+                                           onChange={(e) => setEditingProduct({...editingProduct, icon: e.target.value})}
+                                         />
+                                      </div>
+                                   </div>
+                                 ) : (
+                                   <input 
+                                     className="w-full bg-gray-50 dark:bg-slate-900 border-none rounded-xl p-4 font-bold text-sm" 
+                                     value={editingProduct.icon}
+                                     onChange={(e) => setEditingProduct({...editingProduct, icon: e.target.value})}
+                                     placeholder={editingProduct.iconType === 'emoji' ? "Paste emoji" : "Lucide icon name (e.g. Home)"}
+                                   />
+                                 )}
+                               </div>
+                             </div>
+
+                             <div className="space-y-4">
+                               <div className="flex items-center justify-between">
+                                 <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400">Product Gallery (Images/Links)</label>
+                                 <button 
+                                   onClick={() => setEditingProduct({
+                                     ...editingProduct, 
+                                     gallery: [...(editingProduct.gallery || []), { type: 'link', data: '' }]
+                                   })}
+                                   className="text-[10px] font-bold text-brand-blue bg-blue-50 px-3 py-1 rounded-lg border border-blue-100"
+                                 >+ Add To Gallery</button>
+                               </div>
+                               
+                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                                 {(editingProduct.gallery || []).map((item, gIdx) => (
+                                   <div key={gIdx} className="bg-gray-50 dark:bg-slate-900 p-3 rounded-xl border border-gray-100 dark:border-slate-800 space-y-2">
+                                     <div className="flex items-center justify-between">
+                                        <div className="flex bg-white dark:bg-slate-800 p-1 rounded-lg">
+                                          <button 
+                                            onClick={() => {
+                                              const newGallery = [...(editingProduct.gallery || [])];
+                                              newGallery[gIdx].type = 'file';
+                                              setEditingProduct({...editingProduct, gallery: newGallery});
+                                            }}
+                                            className={`px-2 py-1 rounded-md text-[9px] font-bold ${item.type === 'file' ? 'bg-brand-blue text-white' : 'text-gray-400'}`}
+                                          >File</button>
+                                          <button 
+                                            onClick={() => {
+                                              const newGallery = [...(editingProduct.gallery || [])];
+                                              newGallery[gIdx].type = 'link';
+                                              setEditingProduct({...editingProduct, gallery: newGallery});
+                                            }}
+                                            className={`px-2 py-1 rounded-md text-[9px] font-bold ${item.type === 'link' ? 'bg-brand-blue text-white' : 'text-gray-400'}`}
+                                          >Link</button>
+                                        </div>
+                                        <button 
+                                          onClick={() => {
+                                            const newGallery = (editingProduct.gallery || []).filter((_, i) => i !== gIdx);
+                                            setEditingProduct({...editingProduct, gallery: newGallery});
+                                          }}
+                                          className="text-rose-500 hover:bg-rose-50 p-1 rounded"
+                                        ><X size={12} /></button>
+                                     </div>
+                                     
+                                     {item.type === 'file' ? (
+                                       <div className="relative group">
+                                         <input 
+                                           type="file" 
+                                           accept="image/*"
+                                           className="absolute inset-0 opacity-0 cursor-pointer z-10 h-10 w-full"
+                                           onChange={async (e) => {
+                                             const file = e.target.files?.[0];
+                                             if (file) {
+                                               const b64 = await fileToBase64(file);
+                                               const newGallery = [...(editingProduct.gallery || [])];
+                                               newGallery[gIdx].data = b64;
+                                               newGallery[gIdx].name = file.name;
+                                               setEditingProduct({...editingProduct, gallery: newGallery});
+                                             }
+                                           }}
+                                         />
+                                         <div className="flex items-center gap-2 p-2 bg-white dark:bg-slate-800 border-2 border-dashed border-gray-200 dark:border-slate-700 rounded-lg text-gray-400 overflow-hidden h-10">
+                                            {item.data ? <img src={item.data} className="h-full w-full object-cover rounded" /> : <Paperclip size={12} />}
+                                            <span className="text-[10px] truncate">{item.name || 'Upload Image'}</span>
+                                         </div>
+                                       </div>
+                                     ) : (
+                                       <input 
+                                         className="w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-2 text-[10px] font-bold" 
+                                         placeholder="Image URL"
+                                         value={item.data}
+                                         onChange={(e) => {
+                                           const newGallery = [...(editingProduct.gallery || [])];
+                                           newGallery[gIdx].data = e.target.value;
+                                           setEditingProduct({...editingProduct, gallery: newGallery});
+                                         }}
+                                       />
+                                     )}
+                                   </div>
+                                 ))}
                                </div>
                              </div>
 
@@ -3054,6 +3499,19 @@ export default function App() {
                                           }}
                                         /> Required
                                       </label>
+                                      {(field.type === 'file' || field.type === 'image') && (
+                                        <label className="flex items-center gap-2 text-[10px] font-bold text-brand-blue select-none">
+                                          <input 
+                                            type="checkbox" 
+                                            checked={field.multiple}
+                                            onChange={(e) => {
+                                              const newFields = [...editingProduct.formFields];
+                                              newFields[idx].multiple = e.target.checked;
+                                              setEditingProduct({...editingProduct, formFields: newFields});
+                                            }}
+                                          /> Multiple Items
+                                        </label>
+                                      )}
                                       <button 
                                         onClick={() => {
                                           const newFields = editingProduct.formFields.filter((_, i) => i !== idx);
@@ -3319,6 +3777,46 @@ export default function App() {
               </h3>
               
               <div className="space-y-4">
+                <div className="flex flex-col items-center mb-4">
+                  <div className="relative group mb-2">
+                    <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-gray-50 dark:border-slate-800 bg-gray-100 shadow-inner flex items-center justify-center">
+                      <img 
+                        src={editForm.photoURL || `https://i.pravatar.cc/100?u=${user?.uid}`} 
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                    <label className="absolute bottom-0 right-0 w-8 h-8 bg-brand-gold rounded-full flex items-center justify-center cursor-pointer shadow-lg hover:scale-110 transition-transform">
+                      <Camera size={14} className="text-brand-blue" />
+                      <input 
+                        type="file" 
+                        className="hidden" 
+                        accept="image/*" 
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              setEditForm({ ...editForm, photoURL: reader.result as string });
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+                  <div className="w-full">
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 ml-1">{lang === 'sw' ? 'Picha Link (URL)' : 'Photo Link (URL)'}</label>
+                    <input 
+                      type="url" 
+                      placeholder="https://example.com/picha.jpg"
+                      className="app-input w-full text-[10px]"
+                      value={editForm.photoURL}
+                      onChange={e => setEditForm({ ...editForm, photoURL: e.target.value })}
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">{lang === 'sw' ? 'Jina Kamili' : 'Full Name'}</label>
                   <input 
@@ -3328,15 +3826,31 @@ export default function App() {
                     onChange={e => setEditForm({ ...editForm, fullName: e.target.value })}
                   />
                 </div>
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">{lang === 'sw' ? 'Namba ya Simu' : 'Phone Number'}</label>
-                  <input 
-                    type="tel" 
-                    className="app-input w-full"
-                    placeholder="0..."
-                    value={editForm.phone}
-                    onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
-                  />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">{lang === 'sw' ? 'Namba ya Simu' : 'Phone Number'}</label>
+                    <input 
+                      type="tel" 
+                      className="app-input w-full"
+                      placeholder="0..."
+                      value={editForm.phone}
+                      onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">{lang === 'sw' ? 'Jinsia' : 'Gender'}</label>
+                    <select 
+                      className="app-input w-full"
+                      value={editForm.gender}
+                      onChange={e => setEditForm({ ...editForm, gender: e.target.value })}
+                    >
+                      <option value="">{lang === 'sw' ? 'Chagua' : 'Select'}</option>
+                      <option value="male">{lang === 'sw' ? 'Mwanaume' : 'Male'}</option>
+                      <option value="female">{lang === 'sw' ? 'Mwanamke' : 'Female'}</option>
+                      <option value="other">{lang === 'sw' ? 'N.k' : 'Other'}</option>
+                    </select>
+                  </div>
                 </div>
                 
                 <div className="pt-4 flex gap-3">
@@ -3354,10 +3868,18 @@ export default function App() {
                         await setDoc(doc(db, 'users', user!.uid), {
                           phone: editForm.phone,
                           fullName: editForm.fullName,
+                          gender: editForm.gender,
+                          photoURL: editForm.photoURL,
                           updatedAt: new Date().toISOString()
                         }, { merge: true });
                         
-                        setProfileData({ ...profileData, phone: editForm.phone, fullName: editForm.fullName });
+                        setProfileData({ 
+                          ...profileData, 
+                          phone: editForm.phone, 
+                          fullName: editForm.fullName,
+                          gender: editForm.gender,
+                          photoURL: editForm.photoURL
+                        });
                         setEditingProfile(false);
                         alert(lang === 'sw' ? 'Taarifa zimehifadhiwa!' : 'Information saved!');
                       } catch (error: any) {
@@ -3515,56 +4037,62 @@ export default function App() {
               <div className="p-8 border-b border-gray-100 dark:border-slate-800">
                 <div className="flex items-center justify-between mb-8">
                   <div className="flex items-center gap-6">
-                    <img 
-                      src={selectedAdminUser.photoURL || 'https://i.pravatar.cc/150?u='+selectedAdminUser.id} 
-                      className="w-20 h-20 rounded-[2rem] object-cover ring-4 ring-brand-blue/5" 
-                      referrerPolicy="no-referrer"
-                    />
+                    <div className="relative">
+                      <img 
+                        src={selectedAdminUser.photoURL || 'https://api.dicebear.com/7.x/avataaars/svg?seed='+selectedAdminUser.id} 
+                        className="w-24 h-24 rounded-[2.5rem] object-cover ring-4 ring-brand-blue/5 shadow-xl transition-transform hover:scale-105" 
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className={`absolute -bottom-2 -right-2 w-8 h-8 rounded-full border-4 border-white dark:border-slate-900 flex items-center justify-center shadow-lg ${selectedAdminUser.isBlocked ? 'bg-rose-500' : 'bg-emerald-500'}`}>
+                        {selectedAdminUser.isBlocked ? <Lock size={14} className="text-white" /> : <CheckCircle size={14} className="text-white" />}
+                      </div>
+                    </div>
                     <div>
-                      <h3 className="text-2xl font-display font-bold text-brand-blue dark:text-white mb-1">
-                        {selectedAdminUser.fullName || 'Anonymous User'}
-                      </h3>
+                      <div className="flex items-center gap-3 mb-1">
+                        <h3 className="text-3xl font-display font-medium text-brand-blue dark:text-white">
+                          {selectedAdminUser.fullName || 'Anonymous User'}
+                        </h3>
+                        {selectedAdminUser.isAdmin && <span className="bg-brand-gold/10 text-brand-gold text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded">Admin</span>}
+                      </div>
                       <div className="flex flex-wrap gap-3">
-                        <span className="flex items-center gap-1.5 text-xs text-gray-400 font-bold bg-gray-50 dark:bg-white/5 px-3 py-1.5 rounded-full">
-                          <Mail size={12} /> {selectedAdminUser.email}
+                        <span className="flex items-center gap-2 text-xs text-gray-400 font-bold bg-gray-50 dark:bg-white/5 px-4 py-2 rounded-xl border border-transparent hover:border-brand-blue/10 transition-all cursor-default">
+                          <Mail size={14} className="text-brand-blue/40" /> {selectedAdminUser.email}
                         </span>
-                        <span className="flex items-center gap-1.5 text-xs text-gray-400 font-bold bg-gray-50 dark:bg-white/5 px-3 py-1.5 rounded-full">
-                          <Smartphone size={12} /> {selectedAdminUser.phone || 'N/A'}
+                        <span className="flex items-center gap-2 text-xs text-gray-400 font-bold bg-gray-50 dark:bg-white/5 px-4 py-2 rounded-xl border border-transparent hover:border-brand-blue/10 transition-all cursor-default">
+                          <Smartphone size={14} className="text-brand-blue/40" /> {selectedAdminUser.phone || 'N/A'}
                         </span>
                       </div>
                     </div>
                   </div>
-                  <button onClick={() => setSelectedAdminUser(null)} className="p-3 bg-gray-50 dark:bg-white/5 rounded-2xl text-gray-400 hover:text-rose-500 transition-colors">
+                  <button onClick={() => setSelectedAdminUser(null)} className="p-4 bg-gray-50 dark:bg-white/5 rounded-2xl text-gray-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-all duration-300">
                     <X size={24} />
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   {(() => {
                     const userApps = applications.filter(a => a.userId === selectedAdminUser.id);
                     const totalBorrowed = userApps.filter(a => a.status === 'Approved').reduce((acc, a) => acc + (a.amount || 0), 0);
-                    const activeLoans = userApps.filter(a => a.status === 'Approved');
-                    // Simple balance calculation logic
-                    const totalBalance = totalBorrowed; 
+                    const activeLoansCount = userApps.filter(a => a.status === 'Approved').length;
                     return (
                       <>
-                        <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-3xl">
-                          <p className="text-[10px] text-gray-400 font-black tracking-widest uppercase mb-1">Total Borrowed</p>
-                          <p className="text-lg font-bold text-brand-blue dark:text-white">TSh {totalBorrowed.toLocaleString()}</p>
+                        <div className="p-6 bg-white dark:bg-slate-800/50 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-sm hover:shadow-md transition-all group">
+                          <p className="text-[10px] text-gray-400 font-black tracking-[0.2em] uppercase mb-3">Total Borrowed</p>
+                          <p className="text-2xl font-bold font-display text-brand-blue dark:text-white group-hover:scale-105 transition-transform origin-left">TSh {totalBorrowed.toLocaleString()}</p>
                         </div>
-                        <div className="p-4 bg-amber-50 dark:bg-amber-500/10 rounded-3xl">
-                          <p className="text-[10px] text-amber-600/60 font-black tracking-widest uppercase mb-1">Current Balance</p>
-                          <p className="text-lg font-bold text-amber-600">TSh {totalBalance.toLocaleString()}</p>
+                        <div className="p-6 bg-amber-50/50 dark:bg-amber-500/10 rounded-[2.5rem] border border-amber-100/50 dark:border-amber-500/10 shadow-sm hover:shadow-md transition-all group">
+                          <p className="text-[10px] text-amber-600/60 font-black tracking-[0.2em] uppercase mb-3">Current Balance</p>
+                          <p className="text-2xl font-bold font-display text-amber-600 group-hover:scale-105 transition-transform origin-left">TSh {totalBorrowed.toLocaleString()}</p>
                         </div>
-                        <div className="p-4 bg-emerald-50 dark:bg-emerald-500/10 rounded-3xl">
-                          <p className="text-[10px] text-emerald-600/60 font-black tracking-widest uppercase mb-1">Active Loans</p>
-                          <p className="text-lg font-bold text-emerald-600">{activeLoans.length}</p>
+                        <div className="p-6 bg-emerald-50/50 dark:bg-emerald-500/10 rounded-[2.5rem] border border-emerald-100/50 dark:border-emerald-500/10 shadow-sm hover:shadow-md transition-all group">
+                          <p className="text-[10px] text-emerald-600/60 font-black tracking-[0.2em] uppercase mb-3">Active Loans</p>
+                          <p className="text-2xl font-bold font-display text-emerald-600 group-hover:scale-105 transition-transform origin-left">{activeLoansCount}</p>
                         </div>
-                        <div className="p-4 bg-brand-blue/5 rounded-3xl">
-                          <p className="text-[10px] text-brand-blue/60 font-black tracking-widest uppercase mb-1">{lang === 'sw' ? 'Marejesho' : 'Repayment'}</p>
-                          <p className="text-sm font-bold text-brand-blue dark:text-white">
-                            {activeLoans.length > 0 
-                              ? new Date(new Date(activeLoans[0].timestamp).getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()
+                        <div className="p-6 bg-brand-blue/5 rounded-[2.5rem] border border-brand-blue/10 dark:border-brand-blue/20 shadow-sm hover:shadow-md transition-all group">
+                          <p className="text-[10px] text-brand-blue/60 font-black tracking-[0.2em] uppercase mb-3">{lang === 'sw' ? 'Marejesho' : 'Repayment'}</p>
+                          <p className="text-base font-bold font-display text-brand-blue dark:text-white group-hover:scale-105 transition-transform origin-left">
+                            {userApps.length > 0 
+                              ? new Date(new Date(userApps[0].timestamp).getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()
                               : 'N/A'}
                           </p>
                         </div>
@@ -3574,86 +4102,103 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-8 space-y-6 scrollbar-hide">
+              <div className="flex-1 overflow-y-auto p-8 space-y-8 scrollbar-hide">
                 <div>
-                  <h4 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-4">{lang === 'sw' ? 'Historia ya Mikopo' : 'Loan History'}</h4>
-                  <div className="space-y-3">
+                  <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-3">
+                      <div className="w-1.5 h-6 bg-brand-gold rounded-full" />
+                      <h4 className="text-xs font-black uppercase tracking-[0.3em] text-gray-400">{lang === 'sw' ? 'Historia ya Mikopo' : 'Loan History'}</h4>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
                     {applications.filter(a => a.userId === selectedAdminUser.id).length > 0 ? (
                       applications.filter(a => a.userId === selectedAdminUser.id).map(loan => (
-                        <div key={loan.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/5">
+                        <div key={loan.id} className="p-5 bg-white dark:bg-slate-800/50 rounded-[2rem] border border-gray-100 dark:border-white/5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-white/5 transition-all shadow-sm">
                           <div className="flex items-center gap-4">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                              loan.status === 'Approved' ? 'bg-emerald-100 text-emerald-600' : 
-                              loan.status === 'Rejected' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                              loan.status === 'Approved' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10' : 
+                              loan.status === 'Rejected' ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/10' : 'bg-amber-100 text-amber-600 dark:bg-amber-500/10'
                             }`}>
-                              <Building2 size={20} />
+                              <Building2 size={24} />
                             </div>
                             <div>
-                              <p className="font-bold text-brand-blue dark:text-white text-sm">{loan.loanType}</p>
-                              <p className="text-[10px] text-gray-400 font-bold uppercase">{new Date(loan.timestamp).toLocaleDateString()}</p>
+                              <p className="font-bold text-brand-blue dark:text-white text-base capitalize">{loan.loanType || 'General Loan'}</p>
+                              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{new Date(loan.timestamp).toLocaleDateString('en-GB')}</p>
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="font-bold text-brand-blue dark:text-white text-sm">TSh {(loan.amount || 0).toLocaleString()}</p>
-                            <p className={`text-[10px] font-black uppercase tracking-widest ${
-                              loan.status === 'Approved' ? 'text-emerald-500' : 
-                              loan.status === 'Rejected' ? 'text-rose-500' : 'text-amber-500'
-                            }`}>{loan.status}</p>
+                            <p className="font-bold text-brand-blue dark:text-white text-base">TSh {(loan.amount || 0).toLocaleString()}</p>
+                            <span className={`inline-block px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest mt-1 ${
+                              loan.status === 'Approved' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10' : 
+                              loan.status === 'Rejected' ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/10' : 'bg-amber-100 text-amber-600 dark:bg-amber-500/10'
+                            }`}>{loan.status}</span>
                           </div>
                         </div>
                       ))
                     ) : (
-                      <div className="py-10 text-center text-gray-400">
-                        <p className="text-sm font-bold">No loans found for this user.</p>
+                      <div className="text-center py-20 bg-gray-50 dark:bg-white/5 rounded-[3rem] border-2 border-dashed border-gray-100 dark:border-white/5">
+                        <div className="w-16 h-16 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                          <History size={24} className="text-gray-300" />
+                        </div>
+                        <p className="text-sm font-bold text-gray-400">{lang === 'sw' ? 'Hakuna mikopo kwa mteja huyu' : 'No loans found for this user'}</p>
                       </div>
                     )}
                   </div>
                 </div>
               </div>
 
-              <div className="p-8 bg-gray-50 dark:bg-white/5 border-t border-gray-100 dark:border-slate-800 grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-8 bg-gray-50/50 dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800 grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <button 
                   onClick={() => {
                     setAdminTab('notifs');
                     setBroadcastMessage({ ...broadcastMessage, userId: selectedAdminUser.id });
                     setSelectedAdminUser(null);
                   }}
-                  className="py-4 rounded-2xl bg-brand-blue text-white font-bold text-xs shadow-xl shadow-brand-blue/20 flex items-center justify-center gap-2"
+                  className="py-5 px-4 rounded-[2.5rem] bg-white dark:bg-slate-800 text-brand-blue dark:text-white font-bold text-[11px] uppercase tracking-widest shadow-sm hover:translate-y-[-2px] hover:shadow-md transition-all flex flex-col items-center justify-center gap-3 border border-transparent hover:border-brand-blue/10"
                 >
-                  <Bell size={16} /> Notification
+                  <Bell size={22} className="text-brand-blue/30" /> {lang === 'sw' ? 'Taarifa' : 'Notify'}
                 </button>
                 <button 
-                  onClick={() => setShowingChat(true)}
-                  className="py-4 rounded-2xl bg-brand-gold text-brand-blue font-bold text-xs shadow-xl shadow-brand-gold/20 flex items-center justify-center gap-2"
+                  onClick={() => setShowingChat(!showingChat)}
+                  className={`py-5 px-4 rounded-[2.5rem] font-bold text-[11px] uppercase tracking-widest shadow-sm hover:translate-y-[-2px] hover:shadow-md transition-all flex flex-col items-center justify-center gap-3 border border-transparent ${showingChat ? 'bg-brand-gold text-brand-blue border-brand-gold/20' : 'bg-white dark:bg-slate-800 text-gray-500 dark:text-white'}`}
                 >
-                  <MessagesSquare size={16} /> Live Chat
+                  <MessagesSquare size={22} className={showingChat ? 'text-brand-blue/60' : 'text-brand-gold'} /> {lang === 'sw' ? 'Chat' : 'Chat'}
                 </button>
                 <button 
                   onClick={() => downloadPDFStatement(selectedAdminUser, applications.filter(a => a.userId === selectedAdminUser.id), lang, appConfig)}
-                  className="py-4 rounded-2xl bg-emerald-500 text-white font-bold text-xs shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2"
+                  className="py-5 px-4 rounded-[2.5rem] bg-white dark:bg-slate-800 text-emerald-600 font-bold text-[11px] uppercase tracking-widest shadow-sm hover:translate-y-[-2px] hover:shadow-md transition-all flex flex-col items-center justify-center gap-3 border border-transparent hover:border-emerald-500/10"
                 >
-                  <Download size={16} /> Statement
+                  <Download size={22} className="text-emerald-500/30" /> {lang === 'sw' ? 'Resiti' : 'Receipt'}
                 </button>
                 <button 
                   onClick={async () => {
-                    const { doc, updateDoc } = await import('firebase/firestore');
-                    const { db } = await import('./lib/firebase');
+                    const confirmAction = window.confirm(selectedAdminUser.isBlocked ? 'Unblock user?' : 'Block user?');
+                    if (!confirmAction) return;
                     await updateDoc(doc(db, 'users', selectedAdminUser.id), { isBlocked: !selectedAdminUser.isBlocked });
                     setSelectedAdminUser({ ...selectedAdminUser, isBlocked: !selectedAdminUser.isBlocked });
                   }}
-                  className={`py-4 rounded-2xl font-bold text-xs shadow-xl flex items-center justify-center gap-2 ${
-                    selectedAdminUser.isBlocked ? 'bg-amber-500 text-white shadow-amber-500/20' : 'bg-rose-500 text-white shadow-rose-500/20'
+                  className={`py-4 rounded-3xl font-bold text-xs shadow-sm hover:translate-y-[-2px] hover:shadow-md transition-all flex flex-col items-center justify-center gap-2 ${
+                    selectedAdminUser.isBlocked ? 'bg-amber-500 text-white' : 'bg-white dark:bg-slate-800 text-rose-500'
                   }`}
                 >
-                  <Lock size={16} /> {selectedAdminUser.isBlocked ? 'Unblock' : 'Block'}
+                  <Lock size={20} className={selectedAdminUser.isBlocked ? 'text-white/60' : 'text-rose-500/40'} /> {selectedAdminUser.isBlocked ? 'Unblock' : 'Block'}
                 </button>
               </div>
 
-              {showingChat && (
-                <div className="p-8 border-t border-gray-100 dark:border-slate-800">
-                  <SupportChat lang={lang} user={user} isAdmin={true} targetUserId={selectedAdminUser.id} />
-                </div>
-              )}
+              <AnimatePresence>
+                {showingChat && (
+                  <motion.div 
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden border-t border-gray-100 dark:border-slate-800"
+                  >
+                    <div className="p-8">
+                      <SupportChat lang={lang} user={user} isAdmin={true} targetUserId={selectedAdminUser.id} />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           </motion.div>
         )}
@@ -3789,7 +4334,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <Footer lang={lang} appConfig={appConfig} />
+      <Footer lang={lang} appConfig={appConfig} user={user} setActiveView={setActiveView} />
 
       {/* AI Assistant */}
       <div className="fixed bottom-24 right-6 md:bottom-10 md:right-10 z-[60]">
@@ -3912,10 +4457,10 @@ export default function App() {
                {(activeView === 'history' || activeView === 'apply') && <motion.div layoutId="nav-glow" className="absolute -bottom-2 w-1 h-1 bg-brand-gold rounded-full shadow-[0_0_10px_#D4AF37]" />}
             </button>
             
-            <button onClick={() => setActiveView('profile')} className={`flex flex-col items-center transition-all duration-300 relative z-10 ${activeView === 'profile' ? 'scale-110 text-brand-gold' : 'opacity-50 hover:opacity-100'}`}>
-               <User size={22} strokeWidth={activeView === 'profile' ? 2.5 : 2} />
-               <span className="text-[7px] font-black mt-1.5 uppercase tracking-[0.2em]">{lang === 'sw' ? 'Akaunti' : 'Me'}</span>
-               {activeView === 'profile' && <motion.div layoutId="nav-glow" className="absolute -bottom-2 w-1 h-1 bg-brand-gold rounded-full shadow-[0_0_10px_#D4AF37]" />}
+            <button onClick={() => setActiveView(user ? 'profile' : 'auth')} className={`flex flex-col items-center transition-all duration-300 relative z-10 ${activeView === 'profile' || activeView === 'auth' ? 'scale-110 text-brand-gold' : 'opacity-50 hover:opacity-100'}`}>
+               <User size={22} strokeWidth={activeView === 'profile' || activeView === 'auth' ? 2.5 : 2} />
+               <span className="text-[7px] font-black mt-1.5 uppercase tracking-[0.2em]">{lang === 'sw' ? 'Akaunti' : 'Akaunti'}</span>
+               {(activeView === 'profile' || activeView === 'auth') && <motion.div layoutId="nav-glow" className="absolute -bottom-2 w-1 h-1 bg-brand-gold rounded-full shadow-[0_0_10px_#D4AF37]" />}
             </button>
          </div>
       </div>

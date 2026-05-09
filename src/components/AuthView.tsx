@@ -33,13 +33,15 @@ export const AuthView: React.FC<AuthViewProps> = ({ onSuccess, lang }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [photoLink, setPhotoLink] = useState('');
 
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
     phone: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    gender: ''
   });
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -83,7 +85,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onSuccess, lang }) => {
         const userCredential = await createUserWithEmailAndPassword(auth, emailToUse, formData.password);
         const user = userCredential.user;
 
-        let photoURL = '';
+        let photoURL = photoLink || '';
         if (imageFile) {
           const storageRef = ref(storage, `profiles/${user.uid}`);
           await uploadBytes(storageRef, imageFile);
@@ -100,6 +102,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onSuccess, lang }) => {
           phone: formData.phone,
           email: formData.email,
           photoURL: photoURL,
+          gender: formData.gender,
           role: 'user',
           createdAt: new Date().toISOString()
         });
@@ -136,11 +139,11 @@ export const AuthView: React.FC<AuthViewProps> = ({ onSuccess, lang }) => {
         <form onSubmit={handleSubmit} className="space-y-5">
           {mode === 'signup' && (
             <>
-              <div className="flex justify-center mb-6">
-                <div className="relative group">
+              <div className="flex flex-col items-center mb-6">
+                <div className="relative group mb-4">
                   <div className="w-24 h-24 rounded-full border-4 border-gray-50 bg-gray-100 overflow-hidden shadow-inner flex items-center justify-center">
-                    {imagePreview ? (
-                      <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                    {imagePreview || photoLink ? (
+                      <img src={imagePreview || photoLink} alt="Preview" className="w-full h-full object-cover" />
                     ) : (
                       <User className="w-10 h-10 text-gray-300" />
                     )}
@@ -150,19 +153,49 @@ export const AuthView: React.FC<AuthViewProps> = ({ onSuccess, lang }) => {
                     <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
                   </label>
                 </div>
+                
+                <div className="w-full space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Picha (Link)</label>
+                  <input 
+                    type="url" 
+                    placeholder="https://example.com/picha.jpg"
+                    className="w-full bg-gray-50 border border-gray-100 py-3 px-4 rounded-xl focus:outline-none focus:border-brand-gold transition-all text-xs font-semibold"
+                    value={photoLink}
+                    onChange={(e) => {
+                      setPhotoLink(e.target.value);
+                      if (e.target.value) setImagePreview(null);
+                    }}
+                  />
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Jina Kamili</label>
-                <div className="relative">
-                  <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input 
-                    type="text" 
-                    placeholder="e.g. George Anderson"
-                    className="w-full bg-gray-50 border border-gray-100 py-4 px-12 rounded-2xl focus:outline-none focus:border-brand-gold transition-all font-semibold"
-                    value={formData.fullName}
-                    onChange={(e) => setFormData({...formData, fullName: e.target.value})}
-                  />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Jina Kamili</label>
+                  <div className="relative">
+                    <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input 
+                      type="text" 
+                      placeholder="e.g. George Anderson"
+                      className="w-full bg-gray-50 border border-gray-100 py-4 px-12 rounded-2xl focus:outline-none focus:border-brand-gold transition-all font-semibold"
+                      value={formData.fullName}
+                      onChange={(e) => setFormData({...formData, fullName: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Jinsia</label>
+                  <select 
+                    className="w-full bg-gray-50 border border-gray-100 py-4 px-4 rounded-2xl focus:outline-none focus:border-brand-gold transition-all font-semibold appearance-none"
+                    value={formData.gender}
+                    onChange={(e) => setFormData({...formData, gender: e.target.value})}
+                  >
+                    <option value="">{lang === 'sw' ? 'Chagua Jinsia' : 'Select Gender'}</option>
+                    <option value="male">{lang === 'sw' ? 'Mwanaume' : 'Male'}</option>
+                    <option value="female">{lang === 'sw' ? 'Mwanamke' : 'Female'}</option>
+                    <option value="other">{lang === 'sw' ? 'N.k' : 'Other'}</option>
+                  </select>
                 </div>
               </div>
 
