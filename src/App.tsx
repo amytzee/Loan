@@ -206,8 +206,28 @@ interface AppConfig {
   homeTitleEn?: string;
   homeSubtitleSw?: string;
   homeSubtitleEn?: string;
+  heroCtaSw?: string;
+  heroCtaEn?: string;
   aboutContentSw?: string;
   aboutContentEn?: string;
+  servicesTitleSw?: string;
+  servicesTitleEn?: string;
+  servicesAccentSw?: string;
+  servicesAccentEn?: string;
+  servicesDescSw?: string;
+  servicesDescEn?: string;
+  processTitleSw?: string;
+  processTitleEn?: string;
+  processAccentSw?: string;
+  processAccentEn?: string;
+  processDescSw?: string;
+  processDescEn?: string;
+  applyTitleSw?: string;
+  applyTitleEn?: string;
+  applyDescSw?: string;
+  applyDescEn?: string;
+  footerTextSw?: string;
+  footerTextEn?: string;
 }
 
 interface LoanFormField {
@@ -603,6 +623,18 @@ const SupportChat = ({ lang, user, profileData, isAdmin = false, targetUserId, h
         userPhoto: isAdmin ? null : (profileData?.photoURL || user.photoURL || null)
       }, { merge: true });
 
+      if (!isAdmin) {
+        // Notify admin about new message
+        await addDoc(collection(db, 'notifications'), {
+          userId: 'all',
+          title: 'New Support Message 💬',
+          message: `New message from ${profileData?.fullName || user.displayName || 'User'}: "${newMessage.substring(0, 50)}${newMessage.length > 50 ? '...' : ''}"`,
+          timestamp: new Date().toISOString(),
+          read: false,
+          type: 'alert'
+        });
+      }
+
       setNewMessage('');
     } catch (error) {
       console.error('Error sending message:', error);
@@ -753,25 +785,27 @@ const SupportChat = ({ lang, user, profileData, isAdmin = false, targetUserId, h
                     <AnimatePresence>
                       {activeMessageId === m.id && (
                         <motion.div 
-                          initial={{ opacity: 0, scale: 0.8, y: 10 }}
-                          animate={{ opacity: 1, scale: 1, y: -60 }}
-                          exit={{ opacity: 0, scale: 0.8, y: 10 }}
-                          className={`absolute ${isMe ? 'right-0' : 'left-0'} top-0 bg-white dark:bg-slate-800 shadow-2xl rounded-[1.5rem] p-1.5 border border-gray-100 dark:border-white/10 flex flex-wrap items-center gap-0.5 z-50 w-max max-w-[280px] pointer-events-auto`}
+                          initial={{ opacity: 0, scale: 0.8, y: 0 }}
+                          animate={{ opacity: 1, scale: 1, y: -50 }}
+                          exit={{ opacity: 0, scale: 0.8, y: 0 }}
+                          className={`absolute ${isMe ? 'right-0' : 'left-0'} bottom-full bg-white dark:bg-slate-800 shadow-[0_10px_40px_rgba(0,0,0,0.2)] rounded-3xl p-2 border border-gray-100 dark:border-white/10 flex flex-wrap items-center gap-1 z-50 w-max max-w-[280px] pointer-events-auto mb-2`}
                           onMouseLeave={() => setActiveMessageId(null)}
                         >
-                          {REACTION_EMOJIS.map(emoji => (
-                            <button 
-                              key={emoji}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleReaction(m, emoji);
-                                setActiveMessageId(null);
-                              }}
-                              className={`p-2 hover:scale-125 transition-transform text-xl ${reactions[emoji]?.includes(user.uid) ? 'bg-brand-gold/20 rounded-full' : ''}`}
-                            >
-                              {emoji}
-                            </button>
-                          ))}
+                          <div className="flex gap-1 overflow-x-auto pb-1 px-1 custom-scrollbar min-w-[200px] justify-center">
+                            {REACTION_EMOJIS.map(emoji => (
+                              <button 
+                                key={emoji}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleReaction(m, emoji);
+                                  setActiveMessageId(null);
+                                }}
+                                className={`p-2 hover:scale-125 transition-transform text-2xl filter drop-shadow-sm ${reactions[emoji]?.includes(user.uid) ? 'bg-brand-gold/20 rounded-full' : ''}`}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
                           {canDelete && (
                             <button 
                               onClick={(e) => {
@@ -1533,7 +1567,7 @@ const Hero = ({ lang, users, appConfig }: { lang: Language, users: any[], appCon
           
           <h1 className="text-4xl sm:text-6xl md:text-7xl xl:text-8xl font-display font-bold text-white leading-[1.1] md:leading-[1] mb-6 md:mb-8 text-balance">
             {lang === 'sw' ? (appConfig.homeTitleSw || appConfig.name) : (appConfig.homeTitleEn || appConfig.name)} <br /> 
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-gold via-yellow-200 to-brand-gold drop-shadow-sm">{t.smile}</span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-gold via-yellow-200 to-brand-gold drop-shadow-sm">{translations[lang].hero.smile}</span>
           </h1>
           
           <p className="text-base md:text-xl xl:text-2xl text-slate-300 mb-10 max-w-lg mx-auto lg:mx-0 leading-relaxed font-medium">
@@ -1542,7 +1576,7 @@ const Hero = ({ lang, users, appConfig }: { lang: Language, users: any[], appCon
 
           <div className="flex flex-col sm:flex-row flex-wrap gap-4 md:gap-6 justify-center lg:justify-start">
             <a href="#apply" className="group bg-brand-gold text-brand-blue px-10 py-5 rounded-2xl font-black text-lg flex items-center justify-center gap-3 hover:bg-white transition-all shadow-2xl shadow-brand-gold/30">
-              {t.cta} <ArrowRight size={22} className="group-hover:translate-x-1 transition-transform" />
+              {lang === 'sw' ? (appConfig.heroCtaSw || t.cta) : (appConfig.heroCtaEn || t.cta)} <ArrowRight size={22} className="group-hover:translate-x-1 transition-transform" />
             </a>
             {users.length > 0 && (
               <div className="flex items-center gap-4 py-2 justify-center">
@@ -1706,7 +1740,7 @@ const AboutUs = ({ lang, appConfig }: { lang: Language, appConfig: AppConfig }) 
 };
 
 // --- Services Component ---
-const Services = ({ lang, loanProducts, onSelect }: { lang: Language, loanProducts: LoanProduct[], onSelect: (p: LoanProduct) => void }) => {
+const Services = ({ lang, loanProducts, onSelect, appConfig }: { lang: Language, loanProducts: LoanProduct[], onSelect: (p: LoanProduct) => void, appConfig: AppConfig }) => {
   const t = translations[lang].services;
   return (
     <section id="services" className="py-24 bg-gray-50 dark:bg-slate-950 transition-colors">
@@ -1714,10 +1748,11 @@ const Services = ({ lang, loanProducts, onSelect }: { lang: Language, loanProduc
         <div className="text-center mb-16 md:mb-24">
           <span className="text-brand-gold font-black uppercase tracking-[0.3em] text-[10px] md:text-xs mb-4 block">{lang === 'sw' ? 'CHAGUA HUDUMA' : 'SELECT SERVICE'}</span>
           <h2 className="text-4xl md:text-5xl lg:text-7xl font-display font-medium text-brand-blue dark:text-white mb-6">
-            {t.title} <span className="text-brand-gold italic font-serif">{t.accent}</span>
+            {lang === 'sw' ? (appConfig.servicesTitleSw || t.title) : (appConfig.servicesTitleEn || t.title)}{' '}
+            <span className="text-brand-gold italic font-serif">{lang === 'sw' ? (appConfig.servicesAccentSw || t.accent) : (appConfig.servicesAccentEn || t.accent)}</span>
           </h2>
           <p className="max-w-2xl mx-auto text-gray-500 dark:text-gray-400 text-base md:text-lg leading-relaxed">
-            {t.desc}
+            {lang === 'sw' ? (appConfig.servicesDescSw || t.desc) : (appConfig.servicesDescEn || t.desc)}
           </p>
         </div>
 
@@ -1777,17 +1812,18 @@ const Services = ({ lang, loanProducts, onSelect }: { lang: Language, loanProduc
 };
 
 // --- Process Component ---
-const Process = ({ lang }: { lang: Language }) => {
+const Process = ({ lang, appConfig }: { lang: Language, appConfig: AppConfig }) => {
   const t = translations[lang].process;
   return (
     <section id="process" className="py-20 md:py-32 bg-white">
       <div className="max-w-7xl mx-auto px-4 md:px-6">
         <div className="text-center mb-16 md:mb-20">
           <h2 className="text-3xl sm:text-4xl md:text-6xl font-display font-bold text-brand-blue mb-4 md:mb-6 tracking-tight">
-            {t.title} <span className="text-brand-gold">{t.accent}</span>
+            {lang === 'sw' ? (appConfig.processTitleSw || t.title) : (appConfig.processTitleEn || t.title)}{' '}
+            <span className="text-brand-gold">{lang === 'sw' ? (appConfig.processAccentSw || t.accent) : (appConfig.processAccentEn || t.accent)}</span>
           </h2>
           <p className="text-slate-500 text-base md:text-lg max-w-2xl mx-auto font-medium">
-            {t.desc}
+            {lang === 'sw' ? (appConfig.processDescSw || t.desc) : (appConfig.processDescEn || t.desc)}
           </p>
         </div>
 
@@ -1898,7 +1934,7 @@ const LoanCalculator = ({ lang }: { lang: Language }) => {
 };
 
 // --- Contact Form ---
-const ContactForm = ({ lang, user }: { lang: Language, user: any }) => {
+const ContactForm = ({ lang, user, appConfig }: { lang: Language, user: any, appConfig: AppConfig }) => {
   const t = translations[lang].contact;
   return (
     <section id="apply" className="py-20 md:py-32 bg-white">
@@ -1908,10 +1944,11 @@ const ContactForm = ({ lang, user }: { lang: Language, user: any }) => {
             <div>
               <span className="text-brand-gold font-black uppercase tracking-[0.2em] md:tracking-[0.3em] text-[10px] md:text-xs mb-4 block">{lang === 'sw' ? 'Wasiliana' : 'Contact Us'}</span>
               <h2 className="text-3xl sm:text-4xl md:text-5xl font-display font-bold text-brand-blue mb-6 md:mb-8 leading-tight">
-                {t.title} <br /> <span className="text-brand-gold">{t.accent}</span>
+                {lang === 'sw' ? (appConfig.applyTitleSw || t.title) : (appConfig.applyTitleEn || t.title)} <br /> 
+                <span className="text-brand-gold">{lang === 'sw' ? (appConfig.processAccentSw || t.accent) : (appConfig.processAccentEn || t.accent)}</span>
               </h2>
               <p className="text-slate-500 text-base md:text-lg leading-relaxed font-medium">
-                {t.desc}
+                {lang === 'sw' ? (appConfig.applyDescSw || t.desc) : (appConfig.applyDescEn || t.desc)}
               </p>
             </div>
 
@@ -1965,6 +2002,14 @@ const ContactForm = ({ lang, user }: { lang: Language, user: any }) => {
                 await addDoc(collection(db, 'applications'), {
                   ...data,
                   unreadByAdmin: true
+                });
+                await addDoc(collection(db, 'notifications'), {
+                  userId: 'all',
+                  title: 'Lead from Homepage! 🎯',
+                  message: `${data.fullName} is interested in a ${data.loanType} of ${data.amount}.`,
+                  timestamp: new Date().toISOString(),
+                  read: false,
+                  type: 'alert'
                 });
                 alert(lang === 'sw' ? 'Ombi lako limepokelewa! Tutakucheki hivi punde.' : 'Application received! We will contact you soon.');
                 (e.target as HTMLFormElement).reset();
@@ -2076,8 +2121,8 @@ const Footer = ({ lang, appConfig, user, setActiveView }: { lang: Language, appC
             </div>
             <p className="text-slate-400 leading-relaxed font-medium text-sm md:text-base">
               {lang === 'sw' 
-                ? 'Hatupokei dhamana za maana isiyo thabiti. Tunajenga uaminifu na kutoa msaada pale unapohitajika.' 
-                : 'We prioritize trust and reliable support. Your smile is our best profit.'}
+                ? (appConfig.footerTextSw || 'Tunathamini uaminifu na msaada wa kuaminika. Tabasamu lako ndio faida yetu kubwa.') 
+                : (appConfig.footerTextEn || 'We prioritize trust and reliable support. Your smile is our best profit.')}
             </p>
             <div className="flex gap-2">
               {[Instagram, Phone].map((Icon, i) => (
@@ -2202,7 +2247,31 @@ export default function App() {
     geminiApiKey: '',
     address: 'P.O. BOX 1234, DAR ES SALAAM',
     tin: '123-456-789',
-    vrn: '40012345X'
+    vrn: '40012345X',
+    homeTitleSw: translations.sw.hero.title,
+    homeTitleEn: translations.en.hero.title,
+    homeSubtitleSw: translations.sw.hero.desc,
+    homeSubtitleEn: translations.en.hero.desc,
+    heroCtaSw: translations.sw.hero.cta,
+    heroCtaEn: translations.en.hero.cta,
+    servicesTitleSw: translations.sw.services.title,
+    servicesTitleEn: translations.en.services.title,
+    servicesAccentSw: translations.sw.services.accent,
+    servicesAccentEn: translations.en.services.accent,
+    servicesDescSw: translations.sw.services.desc,
+    servicesDescEn: translations.en.services.desc,
+    processTitleSw: translations.sw.process.title,
+    processTitleEn: translations.en.process.title,
+    processAccentSw: translations.sw.process.accent,
+    processAccentEn: translations.en.process.accent,
+    processDescSw: translations.sw.process.desc,
+    processDescEn: translations.en.process.desc,
+    applyTitleSw: translations.sw.contact.formTitle,
+    applyTitleEn: translations.en.contact.formTitle,
+    applyDescSw: translations.sw.contact.desc,
+    applyDescEn: translations.en.contact.desc,
+    footerTextSw: 'Tunathamini uaminifu na msaada wa kuaminika. Tabasamu lako ndio faida yetu kubwa.',
+    footerTextEn: 'We prioritize trust and reliable support. Your smile is our best profit.'
   });
   const [calcAmount, setCalcAmount] = useState<number>(0);
   const [formAttachments, setFormAttachments] = useState<Record<string, { type: 'file' | 'link', id: string, value: string, preview?: string }[]>>({});
@@ -2580,16 +2649,26 @@ export default function App() {
               return;
             }
             setProfileData(data);
-          } else {
+            } else {
             // Create user profile on first login
             const newProfile = {
               fullName: u.displayName || 'Client',
               email: u.email,
               photoURL: u.photoURL,
               phone: '',
-              createdAt: new Date().toISOString()
+              createdAt: new Date().toISOString(),
+              unreadByAdmin: true // Notification for admin
             };
+            const { collection, addDoc } = await import('firebase/firestore');
             await setDoc(docRef, newProfile);
+            await addDoc(collection(db, 'notifications'), {
+              userId: 'all',
+              title: 'New User Registered! 🆕',
+              message: `${newProfile.fullName} (${newProfile.email}) has just joined the platform.`,
+              timestamp: new Date().toISOString(),
+              read: false,
+              type: 'alert'
+            });
             setProfileData(newProfile);
           }
         } else {
@@ -2699,12 +2778,13 @@ export default function App() {
                   setActiveView('apply');
                   window.scrollTo(0, 0);
                 }} 
+                appConfig={appConfig}
               />
               <MetricsGrid lang={lang} />
-              <Process lang={lang} />
+              <Process lang={lang} appConfig={appConfig} />
               <LoanCalculator lang={lang} />
               <FAQ lang={lang} />
-              <ContactForm lang={lang} user={user} />
+              <ContactForm lang={lang} user={user} appConfig={appConfig} />
             </motion.div>
           )}
 
@@ -2952,6 +3032,14 @@ export default function App() {
                       amount: data['Amount'] || data['Loan Amount'] || 0,
                       customData: data,
                       unreadByAdmin: true
+                    });
+                    await addDoc(collection(db, 'notifications'), {
+                      userId: 'all',
+                      title: 'New Loan Application! 💸',
+                      message: `${user.displayName || profileData?.fullName} applied for a ${selectedProduct?.title} of ${data['Amount'] || data['Loan Amount'] || 0}.`,
+                      timestamp: new Date().toISOString(),
+                      read: false,
+                      type: 'alert'
                     });
                     alert('Application submitted successfully!');
                     setActiveView('history');
@@ -3455,6 +3543,124 @@ export default function App() {
                                       onChange={(e) => setAppConfig({ ...appConfig, homeSubtitleEn: e.target.value })}
                                       placeholder={translations.en.hero.desc}
                                     />
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-4">
+                                     <div className="space-y-2">
+                                       <label className="block text-[10px] font-black uppercase text-gray-400">CTA Button (Swahili)</label>
+                                       <input 
+                                         className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-3 text-sm font-bold dark:text-white"
+                                         value={appConfig.heroCtaSw || ''}
+                                         onChange={(e) => setAppConfig({ ...appConfig, heroCtaSw: e.target.value })}
+                                         placeholder={translations.sw.hero.cta}
+                                       />
+                                     </div>
+                                     <div className="space-y-2">
+                                       <label className="block text-[10px] font-black uppercase text-gray-400">CTA Button (English)</label>
+                                       <input 
+                                         className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-3 text-sm font-bold dark:text-white"
+                                         value={appConfig.heroCtaEn || ''}
+                                         onChange={(e) => setAppConfig({ ...appConfig, heroCtaEn: e.target.value })}
+                                         placeholder={translations.en.hero.cta}
+                                       />
+                                     </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="app-card dark:bg-slate-900 border-gray-100 dark:border-slate-800 space-y-6">
+                                <h3 className="font-bold text-brand-blue dark:text-white flex items-center gap-2"><LayoutDashboard size={18} className="text-brand-gold" /> Services Section CMS</h3>
+                                <div className="space-y-4">
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                      <label className="block text-[10px] font-black uppercase text-gray-400">Title (Swahili)</label>
+                                      <input className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-3 text-sm font-bold dark:text-white" value={appConfig.servicesTitleSw || ''} onChange={(e) => setAppConfig({ ...appConfig, servicesTitleSw: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <label className="block text-[10px] font-black uppercase text-gray-400">Title (English)</label>
+                                      <input className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-3 text-sm font-bold dark:text-white" value={appConfig.servicesTitleEn || ''} onChange={(e) => setAppConfig({ ...appConfig, servicesTitleEn: e.target.value })} />
+                                    </div>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                      <label className="block text-[10px] font-black uppercase text-gray-400">Accent (Swahili)</label>
+                                      <input className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-3 text-sm font-bold dark:text-white" value={appConfig.servicesAccentSw || ''} onChange={(e) => setAppConfig({ ...appConfig, servicesAccentSw: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <label className="block text-[10px] font-black uppercase text-gray-400">Accent (English)</label>
+                                      <input className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-3 text-sm font-bold dark:text-white" value={appConfig.servicesAccentEn || ''} onChange={(e) => setAppConfig({ ...appConfig, servicesAccentEn: e.target.value })} />
+                                    </div>
+                                  </div>
+                                  <div className="space-y-2">
+                                    <label className="block text-[10px] font-black uppercase text-gray-400">Description (Swahili)</label>
+                                    <textarea className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-3 text-sm font-bold dark:text-white" value={appConfig.servicesDescSw || ''} onChange={(e) => setAppConfig({ ...appConfig, servicesDescSw: e.target.value })} />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <label className="block text-[10px] font-black uppercase text-gray-400">Description (English)</label>
+                                    <textarea className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-3 text-sm font-bold dark:text-white" value={appConfig.servicesDescEn || ''} onChange={(e) => setAppConfig({ ...appConfig, servicesDescEn: e.target.value })} />
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="app-card dark:bg-slate-900 border-gray-100 dark:border-slate-800 space-y-6">
+                                <h3 className="font-bold text-brand-blue dark:text-white flex items-center gap-2"><LayoutDashboard size={18} className="text-brand-gold" /> Process Section CMS</h3>
+                                <div className="space-y-4">
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                      <label className="block text-[10px] font-black uppercase text-gray-400">Title (Swahili)</label>
+                                      <input className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-3 text-sm font-bold dark:text-white" value={appConfig.processTitleSw || ''} onChange={(e) => setAppConfig({ ...appConfig, processTitleSw: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <label className="block text-[10px] font-black uppercase text-gray-400">Title (English)</label>
+                                      <input className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-3 text-sm font-bold dark:text-white" value={appConfig.processTitleEn || ''} onChange={(e) => setAppConfig({ ...appConfig, processTitleEn: e.target.value })} />
+                                    </div>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                      <label className="block text-[10px] font-black uppercase text-gray-400">Accent (Swahili)</label>
+                                      <input className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-3 text-sm font-bold dark:text-white" value={appConfig.processAccentSw || ''} onChange={(e) => setAppConfig({ ...appConfig, processAccentSw: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <label className="block text-[10px] font-black uppercase text-gray-400">Accent (English)</label>
+                                      <input className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-3 text-sm font-bold dark:text-white" value={appConfig.processAccentEn || ''} onChange={(e) => setAppConfig({ ...appConfig, processAccentEn: e.target.value })} />
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="app-card dark:bg-slate-900 border-gray-100 dark:border-slate-800 space-y-6">
+                                <h3 className="font-bold text-brand-blue dark:text-white flex items-center gap-2"><CreditCard size={18} className="text-brand-gold" /> Application Banner CMS</h3>
+                                <div className="space-y-4">
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                      <label className="block text-[10px] font-black uppercase text-gray-400">Banner Title (Swahili)</label>
+                                      <input className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-3 text-sm font-bold dark:text-white" value={appConfig.applyTitleSw || ''} onChange={(e) => setAppConfig({ ...appConfig, applyTitleSw: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <label className="block text-[10px] font-black uppercase text-gray-400">Banner Title (English)</label>
+                                      <input className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-3 text-sm font-bold dark:text-white" value={appConfig.applyTitleEn || ''} onChange={(e) => setAppConfig({ ...appConfig, applyTitleEn: e.target.value })} />
+                                    </div>
+                                  </div>
+                                  <div className="space-y-2">
+                                    <label className="block text-[10px] font-black uppercase text-gray-400">Description (Swahili)</label>
+                                    <textarea className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-3 text-sm font-bold dark:text-white" value={appConfig.applyDescSw || ''} onChange={(e) => setAppConfig({ ...appConfig, applyDescSw: e.target.value })} />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <label className="block text-[10px] font-black uppercase text-gray-400">Description (English)</label>
+                                    <textarea className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-3 text-sm font-bold dark:text-white" value={appConfig.applyDescEn || ''} onChange={(e) => setAppConfig({ ...appConfig, applyDescEn: e.target.value })} />
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="app-card dark:bg-slate-900 border-gray-100 dark:border-slate-800 space-y-6">
+                                <h3 className="font-bold text-brand-blue dark:text-white flex items-center gap-2"><Share2 size={18} className="text-brand-gold" /> Footer CMS</h3>
+                                <div className="space-y-4">
+                                  <div className="space-y-2">
+                                    <label className="block text-[10px] font-black uppercase text-gray-400">Footer Text (Swahili)</label>
+                                    <textarea className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-3 text-sm font-bold dark:text-white" value={appConfig.footerTextSw || ''} onChange={(e) => setAppConfig({ ...appConfig, footerTextSw: e.target.value })} />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <label className="block text-[10px] font-black uppercase text-gray-400">Footer Text (English)</label>
+                                    <textarea className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-3 text-sm font-bold dark:text-white" value={appConfig.footerTextEn || ''} onChange={(e) => setAppConfig({ ...appConfig, footerTextEn: e.target.value })} />
                                   </div>
                                 </div>
                               </div>
@@ -4776,6 +4982,15 @@ export default function App() {
                       </div>
                     </div>
                   </div>
+                  <button 
+                    onClick={() => {
+                      setShowingChat(true);
+                      // In admin view, chat needs targetUserId
+                    }}
+                    className={`py-3 md:py-5 px-6 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 border border-brand-blue/10 hover:bg-brand-blue hover:text-white transition-all ${showingChat ? 'bg-brand-blue text-white' : 'text-brand-blue'}`}
+                  >
+                    <MessagesSquare size={18} /> {lang === 'sw' ? 'Message' : 'Message'}
+                  </button>
                   <button onClick={() => setSelectedAdminUser(null)} className="p-3 md:p-4 bg-gray-50 dark:bg-white/5 rounded-2xl text-gray-400 hover:text-rose-500 transition-all">
                     <X size={20} md:size={24} />
                   </button>
