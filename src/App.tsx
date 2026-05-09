@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { 
@@ -543,10 +543,12 @@ const downloadPDFStatement = (user: any, applications: any[], lang: Language, ap
 };
 
 // --- SupportChat Component ---
-const SupportChat = ({ lang, user, isAdmin = false, targetUserId }: { lang: Language, user: any, isAdmin?: boolean, targetUserId?: string }) => {
+const SupportChat = ({ lang, user, isAdmin = false, targetUserId, height = "h-[600px]" }: { lang: Language, user: any, isAdmin?: boolean, targetUserId?: string, height?: string }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
+  const longPressTimer = useRef<any>(null);
   const chatId = isAdmin ? targetUserId : user.uid;
 
   useEffect(() => {
@@ -623,10 +625,25 @@ const SupportChat = ({ lang, user, isAdmin = false, targetUserId }: { lang: Lang
     }
   }, [messages]);
 
-  const REACTION_EMOJIS = ['❤️', '👍', '🔥', '👏', '😂'];
+  const REACTION_EMOJIS = ['❤️', '👍', '🔥', '👏', '😂', '😮', '😢'];
+
+  const startLongPress = (id: string) => {
+    longPressTimer.current = setTimeout(() => {
+      setActiveMessageId(id);
+    }, 500);
+  };
+
+  const endLongPress = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+    }
+  };
 
   return (
-    <div className={`flex flex-col h-[600px] bg-white dark:bg-slate-900 rounded-[2.5rem] overflow-hidden border border-gray-100 dark:border-white/5 ${isAdmin ? '' : 'shadow-2xl shadow-brand-blue/10 relative z-[60]'}`}>
+    <div 
+      className={`flex flex-col ${height === 'h-[600px]' ? 'h-[500px] md:h-[600px] max-h-[80vh]' : height} bg-white dark:bg-slate-900 rounded-[2.5rem] overflow-hidden border border-gray-100 dark:border-white/5 ${isAdmin ? '' : 'shadow-2xl shadow-brand-blue/10 relative z-[60]'}`}
+      onClick={() => setActiveMessageId(null)}
+    >
       <div className={`p-6 ${isAdmin ? 'bg-slate-800' : 'bg-brand-blue'} text-white flex items-center justify-between shadow-lg relative z-20`}>
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-brand-gold shadow-inner">
@@ -674,12 +691,18 @@ const SupportChat = ({ lang, user, isAdmin = false, targetUserId }: { lang: Lang
               <div className="absolute inset-0 bg-brand-gold/10 rounded-full animate-ping opacity-20" />
               <MessagesSquare className="text-brand-gold group-hover:scale-110 transition-transform" size={48} />
             </div>
-            <div className="space-y-2">
-              <h5 className="font-bold text-gray-800 dark:text-white">Andika hapa kuanza</h5>
-              <p className="text-xs font-medium text-gray-400 max-w-[200px] leading-relaxed mx-auto">
-                {lang === 'sw' ? 'Tuko online sasa hivi kukusaidia na maswali yoyote uliyonayo.' : 'We are online now to help with any questions you may have.'}
-              </p>
-            </div>
+              <div className="space-y-4">
+                <h5 className="font-bold text-gray-800 dark:text-white">Andika hapa kuanza</h5>
+                <p className="text-xs font-medium text-gray-400 max-w-[200px] leading-relaxed mx-auto">
+                  {lang === 'sw' ? 'Tuko online sasa hivi kukusaidia na maswali yoyote uliyonayo.' : 'We are online now to help with any questions you may have.'}
+                </p>
+                <div className="pt-4 flex flex-col items-center gap-2">
+                  <div className="w-1 h-10 bg-gradient-to-b from-brand-gold/20 to-transparent rounded-full" />
+                  <p className="text-[9px] font-black text-brand-gold/40 uppercase tracking-[0.2em]">
+                    {lang === 'sw' ? 'Shikilia ujumbe kuweka emoji' : 'Hold message to react'}
+                  </p>
+                </div>
+              </div>
           </div>
         ) : (
           messages.map((m, i) => {
@@ -691,12 +714,57 @@ const SupportChat = ({ lang, user, isAdmin = false, targetUserId }: { lang: Lang
               <div key={m.id || i} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} group slide-up`}>
                 <div className={`relative flex items-end gap-3 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
                   {/* Bubble */}
-                  <div className={`max-w-[85%] p-5 rounded-[2rem] text-sm font-medium transition-all hover:shadow-xl relative ${
+                  <div 
+                    onMouseDown={() => m.id && startLongPress(m.id)}
+                    onTouchStart={() => m.id && startLongPress(m.id)}
+                    onMouseUp={endLongPress}
+                    onTouchEnd={endLongPress}
+                    onMouseLeave={endLongPress}
+                    className={`max-w-[85%] p-5 rounded-[2rem] text-sm font-medium transition-all hover:shadow-xl relative cursor-pointer select-none ${
                     isMe 
                       ? 'bg-gradient-to-br from-brand-blue to-slate-800 text-white rounded-tr-none shadow-lg shadow-brand-blue/10 border border-white/5'
                       : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-200 rounded-tl-none border border-gray-100 dark:border-white/5 shadow-sm'
                   }`}>
                     {m.text}
+                    {/* Reaction Overlay on Hold */}
+                    <AnimatePresence>
+                      {activeMessageId === m.id && (
+                        <motion.div 
+                          initial={{ opacity: 0, scale: 0.8, y: 10 }}
+                          animate={{ opacity: 1, scale: 1, y: -50 }}
+                          exit={{ opacity: 0, scale: 0.8, y: 10 }}
+                          className={`absolute ${isMe ? 'right-0' : 'left-0'} top-0 bg-white dark:bg-slate-800 shadow-2xl rounded-full p-2 border border-gray-100 dark:border-white/10 flex items-center gap-1 z-50`}
+                          onMouseLeave={() => setActiveMessageId(null)}
+                        >
+                          {REACTION_EMOJIS.map(emoji => (
+                            <button 
+                              key={emoji}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleReaction(m, emoji);
+                                setActiveMessageId(null);
+                              }}
+                              className={`p-2 hover:scale-125 transition-transform text-lg ${reactions[emoji]?.includes(user.uid) ? 'bg-brand-gold/20 rounded-full' : ''}`}
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                          {canDelete && (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                m.id && deleteMessage(m.id);
+                                setActiveMessageId(null);
+                              }}
+                              className="p-2 hover:scale-125 transition-transform text-rose-500 ml-1 border-l border-gray-100 dark:border-white/10 pl-2"
+                              title="Delete Message"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                     <div className={`text-[9px] mt-3 opacity-50 font-black uppercase tracking-widest flex items-center gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
                       {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       {m.isAdmin && <span className="bg-brand-gold text-brand-blue px-1.5 py-0.5 rounded-sm text-[8px] font-black">SUPPORT</span>}
@@ -749,7 +817,7 @@ const SupportChat = ({ lang, user, isAdmin = false, targetUserId }: { lang: Lang
         <div id="chat-bottom" />
       </div>
 
-      <form onSubmit={sendMessage} className="p-5 bg-white dark:bg-slate-800 border-t border-gray-100 dark:border-white/10 flex gap-3 relative z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.02)]">
+      <form onSubmit={sendMessage} className="p-5 bg-white dark:bg-slate-800 border-t border-gray-100 dark:border-white/20 flex gap-3 relative z-30 shadow-[0_-8px_30px_rgba(0,0,0,0.1)] shrink-0">
         <div className="flex-1 relative flex items-center">
           <input 
             type="text" 
@@ -4544,8 +4612,8 @@ export default function App() {
 
               <div className="flex-1 overflow-y-auto custom-scrollbar">
                 {showingChat ? (
-                  <div className="p-4 md:p-8">
-                    <SupportChat lang={lang} user={user} isAdmin={true} targetUserId={selectedAdminUser.id} />
+                  <div className="p-4 md:p-8 h-[600px] md:h-[650px]">
+                    <SupportChat lang={lang} user={user} isAdmin={true} targetUserId={selectedAdminUser.id} height="h-full" />
                   </div>
                 ) : (
                   <div className="p-6 md:p-8 space-y-8">
@@ -4674,8 +4742,8 @@ export default function App() {
                     exit={{ height: 0, opacity: 0 }}
                     className="overflow-hidden border-t border-gray-100 dark:border-slate-800"
                   >
-                    <div className="p-8">
-                      <SupportChat lang={lang} user={user} isAdmin={true} targetUserId={selectedAdminUser.id} />
+                    <div className="p-4 md:p-8 h-[500px]">
+                      <SupportChat lang={lang} user={user} isAdmin={true} targetUserId={selectedAdminUser.id} height="h-full" />
                     </div>
                   </motion.div>
                 )}
