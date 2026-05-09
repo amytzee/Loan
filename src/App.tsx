@@ -103,7 +103,8 @@ import {
   serverTimestamp, 
   doc, 
   updateDoc,
-  deleteDoc 
+  deleteDoc,
+  setDoc
 } from 'firebase/firestore';
 
 import { auth, db } from './lib/firebase';
@@ -543,13 +544,21 @@ const downloadPDFStatement = (user: any, applications: any[], lang: Language, ap
 };
 
 // --- SupportChat Component ---
-const SupportChat = ({ lang, user, isAdmin = false, targetUserId, height = "h-[600px]" }: { lang: Language, user: any, isAdmin?: boolean, targetUserId?: string, height?: string }) => {
+const SupportChat = ({ lang, user, profileData, isAdmin = false, targetUserId, height = "h-[600px]" }: { lang: Language, user: any, profileData?: any, isAdmin?: boolean, targetUserId?: string, height?: string }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
   const longPressTimer = useRef<any>(null);
   const chatId = isAdmin ? targetUserId : user.uid;
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isAdmin && chatId) {
+      // Mark as read when admin opens the chat
+      updateDoc(doc(db, 'support_chats', chatId), { unreadByAdmin: false }).catch(console.error);
+    }
+  }, [isAdmin, chatId]);
 
   useEffect(() => {
     if (!chatId) return;
@@ -573,13 +582,25 @@ const SupportChat = ({ lang, user, isAdmin = false, targetUserId, height = "h-[6
     if (!newMessage.trim() || !chatId) return;
 
     try {
-      await addDoc(collection(db, 'support_messages', chatId, 'messages'), {
+      const messageData = {
         senderId: user.uid,
         text: newMessage,
         timestamp: new Date().toISOString(),
         isAdmin: isAdmin,
-        likes: []
-      });
+        reactions: {}
+      };
+
+      await addDoc(collection(db, 'support_messages', chatId, 'messages'), messageData);
+      
+      // Update chat summary for Admin view
+      await setDoc(doc(db, 'support_chats', chatId), {
+        lastMessage: newMessage,
+        lastTimestamp: messageData.timestamp,
+        unreadByAdmin: !isAdmin,
+        userId: chatId,
+        userName: isAdmin ? (messages.find(m => !m.isAdmin)?.senderId || 'Client') : (profileData?.fullName || user.displayName || 'Client')
+      }, { merge: true });
+
       setNewMessage('');
     } catch (error) {
       console.error('Error sending message:', error);
@@ -1330,7 +1351,7 @@ const UserProfile = ({
             <div className="hidden lg:block">
               {showingChat && (
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                  <SupportChat lang={lang} user={user} />
+                  <SupportChat lang={lang} user={user} profileData={profileData} />
                 </motion.div>
               )}
             </div>
@@ -1340,7 +1361,7 @@ const UserProfile = ({
           <div className="lg:col-span-8">
             {showingChat && (
               <div className="lg:hidden mb-8">
-                <SupportChat lang={lang} user={user} />
+                <SupportChat lang={lang} user={user} profileData={profileData} />
               </div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-8">
@@ -2216,6 +2237,7 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showNotifCenter, setShowNotifCenter] = useState(false);
   const [showingChat, setShowingChat] = useState(false);
+  const [supportChats, setSupportChats] = useState<any[]>([]);
   const [repayingLoan, setRepayingLoan] = useState<any | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<LoanProduct | null>(null);
   const [editingProduct, setEditingProduct] = useState<LoanProduct | null>(null);
@@ -2400,6 +2422,10 @@ export default function App() {
           // Admin fetches everything
           unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
             setAllUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          });
+
+          onSnapshot(collection(db, 'support_chats'), (snapshot) => {
+            setSupportChats(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
           });
 
           unsubApps = onSnapshot(query(collection(db, 'applications'), orderBy('timestamp', 'desc')), (snapshot) => {
@@ -3026,9 +3052,12 @@ export default function App() {
                             setAdminTab(tab);
                             setSearchTerm('');
                           }}
-                          className={`px-4 py-2 rounded-xl text-xs font-bold capitalize transition-all whitespace-nowrap ${adminTab === tab ? 'bg-white text-brand-blue shadow-sm' : 'text-gray-400'}`}
+                          className={`px-4 py-2 rounded-xl text-xs font-bold capitalize transition-all whitespace-nowrap relative flex items-center gap-2 ${adminTab === tab ? 'bg-white text-brand-blue shadow-sm' : 'text-gray-400'}`}
                         >
                           {tab}
+                          {tab === 'users' && supportChats.some(c => c.unreadByAdmin) && (
+                            <span className="flex h-2 w-2 rounded-full bg-brand-gold animate-pulse shadow-[0_0_8px_rgba(255,191,0,0.8)]" />
+                          )}
                         </button>
                       ))}
                     </div>
@@ -3790,9 +3819,25 @@ export default function App() {
                                 <img src={u.photoURL || 'https://i.pravatar.cc/150?u='+u.id} className="w-14 h-14 rounded-2xl object-cover ring-4 ring-brand-blue/5" referrerPolicy="no-referrer" />
                                 {u.email?.includes('gmail.com') && <div className="absolute -bottom-1 -right-1 bg-white p-1 rounded-full shadow-sm"><img src="https://www.google.com/favicon.ico" className="w-3 h-3" /></div>}
                                 {u.isBlocked && <div className="absolute -top-1 -left-1 bg-rose-500 text-[8px] font-black text-white px-1.5 py-0.5 rounded-lg shadow-lg">BLOCKED</div>}
+                                {(() => {
+                                  const chat = supportChats.find(c => c.id === u.id);
+                                  return chat?.unreadByAdmin && (
+                                    <div className="absolute -top-1 -right-1 bg-brand-gold text-brand-blue w-6 h-6 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-800 animate-bounce shadow-lg">
+                                      <MessageSquare size={12} />
+                                    </div>
+                                  );
+                                })()}
                               </div>
                               <div className="flex-1 min-w-0">
                                 <h3 className="font-bold text-brand-blue truncate group-hover:text-brand-gold transition-colors">{u.fullName || 'Anonymous User'}</h3>
+                                {(() => {
+                                  const chat = supportChats.find(c => c.id === u.id);
+                                  return chat && (
+                                    <p className="text-[9px] text-brand-gold font-bold italic truncate mb-1 bg-brand-gold/5 px-2 py-0.5 rounded-md inline-block max-w-full">
+                                      {chat.lastMessage}
+                                    </p>
+                                  );
+                                })()}
                                 <div className="flex items-center gap-2 text-[10px] text-gray-500 font-medium">
                                    <Mail size={10} className="shrink-0" /> <span className="truncate">{u.email}</span>
                                 </div>
@@ -4613,7 +4658,7 @@ export default function App() {
               <div className="flex-1 overflow-y-auto custom-scrollbar">
                 {showingChat ? (
                   <div className="p-4 md:p-8 h-[600px] md:h-[650px]">
-                    <SupportChat lang={lang} user={user} isAdmin={true} targetUserId={selectedAdminUser.id} height="h-full" />
+                    <SupportChat lang={lang} user={user} profileData={profileData} isAdmin={true} targetUserId={selectedAdminUser.id} height="h-full" />
                   </div>
                 ) : (
                   <div className="p-6 md:p-8 space-y-8">
@@ -4743,7 +4788,7 @@ export default function App() {
                     className="overflow-hidden border-t border-gray-100 dark:border-slate-800"
                   >
                     <div className="p-4 md:p-8 h-[500px]">
-                      <SupportChat lang={lang} user={user} isAdmin={true} targetUserId={selectedAdminUser.id} height="h-full" />
+                      <SupportChat lang={lang} user={user} profileData={profileData} isAdmin={true} targetUserId={selectedAdminUser.id} height="h-full" />
                     </div>
                   </motion.div>
                 )}
