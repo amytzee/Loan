@@ -51,6 +51,8 @@ import {
   Send,
   Trash2,
   Gift,
+  Heart,
+  Smile,
   HelpCircle,
   ExternalLink,
   Download,
@@ -87,6 +89,7 @@ interface ChatMessage {
   text: string;
   timestamp: string;
   isAdmin: boolean;
+  likes?: string[];
 }
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from '@google/genai';
@@ -99,7 +102,8 @@ import {
   addDoc, 
   serverTimestamp, 
   doc, 
-  updateDoc 
+  updateDoc,
+  deleteDoc 
 } from 'firebase/firestore';
 
 import { auth, db } from './lib/firebase';
@@ -551,7 +555,7 @@ const SupportChat = ({ lang, user, isAdmin = false, targetUserId }: { lang: Lang
     const q = query(
       collection(db, 'support_messages', chatId, 'messages'),
       orderBy('timestamp', 'asc'),
-      limit(50)
+      limit(100)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot: any) => {
@@ -571,7 +575,8 @@ const SupportChat = ({ lang, user, isAdmin = false, targetUserId }: { lang: Lang
         senderId: user.uid,
         text: newMessage,
         timestamp: new Date().toISOString(),
-        isAdmin: isAdmin
+        isAdmin: isAdmin,
+        likes: []
       });
       setNewMessage('');
     } catch (error) {
@@ -579,60 +584,192 @@ const SupportChat = ({ lang, user, isAdmin = false, targetUserId }: { lang: Lang
     }
   };
 
+  const deleteMessage = async (msgId: string) => {
+    if (!chatId || !msgId) return;
+    try {
+      await deleteDoc(doc(db, 'support_messages', chatId, 'messages', msgId));
+    } catch (error) {
+      console.error('Error deleting message:', error);
+    }
+  };
+
+  const toggleReaction = async (msg: ChatMessage, emoji: string) => {
+    if (!chatId || !msg.id) return;
+    const currentReactions = (msg as any).reactions || {};
+    const usersWhoReacted = currentReactions[emoji] || [];
+    
+    let newUsers;
+    if (usersWhoReacted.includes(user.uid)) {
+      newUsers = usersWhoReacted.filter((id: string) => id !== user.uid);
+    } else {
+      newUsers = [...usersWhoReacted, user.uid];
+    }
+    
+    const newReactions = { ...currentReactions, [emoji]: newUsers };
+    
+    try {
+      await updateDoc(doc(db, 'support_messages', chatId, 'messages', msg.id), {
+        reactions: newReactions
+      });
+    } catch (error) {
+      console.error('Error reacting to message:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (messages.length > 0) {
+      const bottom = document.getElementById('chat-bottom');
+      bottom?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
+
+  const REACTION_EMOJIS = ['❤️', '👍', '🔥', '👏', '😂'];
+
   return (
-    <div className={`flex flex-col h-[500px] bg-white dark:bg-slate-900 rounded-[2rem] overflow-hidden border border-gray-100 dark:border-white/5 ${isAdmin ? '' : 'shadow-2xl'}`}>
-      <div className={`p-6 ${isAdmin ? 'bg-slate-800' : 'bg-brand-blue'} text-white flex items-center justify-between`}>
+    <div className={`flex flex-col h-[600px] bg-white dark:bg-slate-900 rounded-[2.5rem] overflow-hidden border border-gray-100 dark:border-white/5 ${isAdmin ? '' : 'shadow-2xl shadow-brand-blue/10 relative z-[60]'}`}>
+      <div className={`p-6 ${isAdmin ? 'bg-slate-800' : 'bg-brand-blue'} text-white flex items-center justify-between shadow-lg relative z-20`}>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-brand-gold">
-            <MessagesSquare size={20} />
+          <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-brand-gold shadow-inner">
+            <MessagesSquare size={24} />
           </div>
           <div>
-            <h4 className="font-bold text-sm">{lang === 'sw' ? 'Msaada wa Moja kwa Moja' : 'Live Support Chat'}</h4>
-            <p className="text-[10px] opacity-60 font-black uppercase tracking-widest">{isAdmin ? 'Customer Support' : 'Online Now'}</p>
+            <h4 className="font-bold text-base tracking-tight">{lang === 'sw' ? 'Msaada wa Moja kwa Moja' : 'Live Support Chat'}</h4>
+            <p className="text-[10px] opacity-60 font-black uppercase tracking-widest flex items-center gap-2">
+              {isAdmin ? 'Customer Support Agent' : 'Support Team Online'}
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
+            </p>
           </div>
+        </div>
+        <div className="flex items-center gap-3">
+           {isAdmin && messages.length > 0 && (
+             <button 
+               onClick={async () => {
+                 if (!confirm(lang === 'sw' ? 'Futa mazungumzo yote?' : 'Delete all conversation?')) return;
+                 for (const m of messages) {
+                   if (m.id) await deleteMessage(m.id);
+                 }
+               }}
+               className="p-2.5 bg-white/10 hover:bg-rose-500/30 rounded-xl text-white transition-all transform hover:scale-110 active:scale-95"
+               title="Clear Chat"
+             >
+               <Trash2 size={18} />
+             </button>
+           )}
+           <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full shadow-inner border border-white/5">
+              <span className="text-xs font-black">{messages.length}</span>
+              <MessageSquare size={14} className="opacity-60" />
+           </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-hide bg-gray-50/50 dark:bg-slate-900/50">
+      <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-gray-50/50 dark:bg-slate-950/20 scroll-smooth custom-scrollbar">
         {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="w-8 h-8 border-4 border-brand-gold border-t-transparent rounded-full animate-spin" />
+          <div className="flex flex-col items-center justify-center h-full space-y-4">
+            <div className="w-12 h-12 border-4 border-brand-gold border-t-transparent rounded-full animate-spin shadow-lg shadow-brand-gold/20" />
+            <p className="text-[10px] font-black text-brand-gold uppercase tracking-[0.3em]">Loading Chat...</p>
           </div>
         ) : messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center p-8">
-            <Sparkles className="text-brand-gold/20 mb-4" size={48} />
-            <p className="text-sm font-bold text-gray-400">
-              {lang === 'sw' ? 'Anza mazungumzo nasi sasa hivi!' : 'Start a conversation with us now!'}
-            </p>
+          <div className="flex flex-col items-center justify-center h-full text-center p-8 space-y-6">
+            <div className="w-24 h-24 bg-brand-gold/5 rounded-full flex items-center justify-center shadow-inner relative group">
+              <div className="absolute inset-0 bg-brand-gold/10 rounded-full animate-ping opacity-20" />
+              <MessagesSquare className="text-brand-gold group-hover:scale-110 transition-transform" size={48} />
+            </div>
+            <div className="space-y-2">
+              <h5 className="font-bold text-gray-800 dark:text-white">Andika hapa kuanza</h5>
+              <p className="text-xs font-medium text-gray-400 max-w-[200px] leading-relaxed mx-auto">
+                {lang === 'sw' ? 'Tuko online sasa hivi kukusaidia na maswali yoyote uliyonayo.' : 'We are online now to help with any questions you may have.'}
+              </p>
+            </div>
           </div>
         ) : (
-          messages.map((m, i) => (
-            <div key={m.id || i} className={`flex ${((isAdmin && m.isAdmin) || (!isAdmin && !m.isAdmin)) ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[80%] p-4 rounded-2xl text-sm ${
-                ((isAdmin && m.isAdmin) || (!isAdmin && !m.isAdmin))
-                  ? 'bg-brand-blue text-white rounded-tr-none shadow-md shadow-brand-blue/5'
-                  : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-200 rounded-tl-none border border-gray-100 dark:border-white/5 shadow-sm'
-              }`}>
-                {m.text}
-                <div className="text-[8px] mt-1 opacity-40 font-black uppercase tracking-tighter">
-                  {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          messages.map((m, i) => {
+            const isMe = (isAdmin && m.isAdmin) || (!isAdmin && !m.isAdmin) || (m.senderId === user.uid);
+            const canDelete = isAdmin || (m.senderId === user.uid);
+            const reactions = (m as any).reactions || {};
+
+            return (
+              <div key={m.id || i} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} group slide-up`}>
+                <div className={`relative flex items-end gap-3 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                  {/* Bubble */}
+                  <div className={`max-w-[85%] p-5 rounded-[2rem] text-sm font-medium transition-all hover:shadow-xl relative ${
+                    isMe 
+                      ? 'bg-gradient-to-br from-brand-blue to-slate-800 text-white rounded-tr-none shadow-lg shadow-brand-blue/10 border border-white/5'
+                      : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-200 rounded-tl-none border border-gray-100 dark:border-white/5 shadow-sm'
+                  }`}>
+                    {m.text}
+                    <div className={`text-[9px] mt-3 opacity-50 font-black uppercase tracking-widest flex items-center gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                      {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {m.isAdmin && <span className="bg-brand-gold text-brand-blue px-1.5 py-0.5 rounded-sm text-[8px] font-black">SUPPORT</span>}
+                    </div>
+                  </div>
+
+                  {/* Quick Reactions Selector (appears on hover) */}
+                  <div className={`flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 transform ${isMe ? 'translate-x-[-10px]' : 'translate-x-[10px]'}`}>
+                    <div className="flex bg-white dark:bg-slate-800 shadow-xl rounded-full p-1 border border-gray-100 dark:border-white/5">
+                      {REACTION_EMOJIS.slice(0, 3).map(emoji => (
+                        <button 
+                          key={emoji}
+                          onClick={() => toggleReaction(m, emoji)}
+                          className={`p-1.5 hover:scale-125 transition-transform text-sm ${reactions[emoji]?.includes(user.uid) ? 'bg-brand-gold/20 rounded-full' : ''}`}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                      {canDelete && (
+                        <button 
+                          onClick={() => m.id && deleteMessage(m.id)}
+                          className="p-1.5 hover:scale-125 transition-transform text-gray-300 hover:text-rose-500"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
+
+                {/* Visible Reactions */}
+                {Object.keys(reactions).length > 0 && (
+                  <div className={`mt-[-10px] flex flex-wrap gap-1 relative z-10 ${isMe ? 'mr-6' : 'ml-6'}`}>
+                    {Object.entries(reactions).map(([emoji, users]: [string, any]) => users.length > 0 && (
+                      <button 
+                        key={emoji}
+                        onClick={() => toggleReaction(m, emoji)}
+                        className={`flex items-center gap-1 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-full text-[10px] shadow-sm border border-gray-100 dark:border-white/5 hover:scale-105 transition-transform ${users.includes(user.uid) ? 'border-brand-gold bg-brand-gold/5' : ''}`}
+                      >
+                        <span>{emoji}</span>
+                        <span className="font-bold opacity-60">{users.length}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          ))
+            );
+          })
         )}
+        <div id="chat-bottom" />
       </div>
 
-      <form onSubmit={sendMessage} className="p-4 bg-white dark:bg-slate-800 border-t border-gray-100 dark:border-white/10 flex gap-2">
-        <input 
-          type="text" 
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          placeholder={lang === 'sw' ? 'Andika hapa...' : 'Type here...'}
-          className="flex-1 bg-gray-50 dark:bg-white/5 border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-gold transition-all"
-        />
-        <button type="submit" className="p-3 bg-brand-gold text-brand-blue rounded-xl hover:scale-105 active:scale-95 transition-all shadow-md shadow-brand-gold/10">
-          <Send size={20} />
+      <form onSubmit={sendMessage} className="p-5 bg-white dark:bg-slate-800 border-t border-gray-100 dark:border-white/10 flex gap-3 relative z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.02)]">
+        <div className="flex-1 relative flex items-center">
+          <input 
+            type="text" 
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            placeholder={lang === 'sw' ? 'Andika ujumbe wako...' : 'Type a message...'}
+            className="w-full bg-gray-50 dark:bg-white/5 border border-transparent focus:border-brand-gold/30 rounded-2xl pl-5 pr-14 py-4 text-sm font-semibold focus:ring-0 transition-all dark:text-white placeholder:text-gray-400"
+          />
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-3">
+             <button type="button" className="text-gray-400 hover:text-brand-gold transition-all hover:scale-110">
+               <Smile size={22} />
+             </button>
+          </div>
+        </div>
+        <button 
+          type="submit" 
+          disabled={!newMessage.trim()}
+          className="w-14 h-14 bg-brand-gold text-brand-blue rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-xl shadow-brand-gold/30 disabled:opacity-30 disabled:scale-100 flex items-center justify-center shrink-0"
+        >
+          <Send size={24} className="translate-x-0.5 -translate-y-0.5" />
         </button>
       </form>
     </div>
@@ -4405,80 +4542,88 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8 custom-scrollbar">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {(() => {
-                    const userApps = applications.filter(a => a.userId === selectedAdminUser.id);
-                    const totalBorrowed = userApps.filter(a => a.status === 'Approved' || a.status === 'Disbursed').reduce((acc, a) => acc + (a.amount || 0), 0);
-                    const activeLoansCount = userApps.filter(a => a.status === 'Approved').length;
-                    return (
-                      <>
-                        <div className="p-5 md:p-6 bg-white dark:bg-slate-800/50 rounded-[2rem] md:rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-sm">
-                          <p className="text-[9px] text-gray-400 font-black tracking-[0.2em] uppercase mb-2">Total Borrowed</p>
-                          <p className="text-xl md:text-2xl font-bold font-display text-brand-blue dark:text-white">TSh {totalBorrowed.toLocaleString()}</p>
+              <div className="flex-1 overflow-y-auto custom-scrollbar">
+                {showingChat ? (
+                  <div className="p-4 md:p-8">
+                    <SupportChat lang={lang} user={user} isAdmin={true} targetUserId={selectedAdminUser.id} />
+                  </div>
+                ) : (
+                  <div className="p-6 md:p-8 space-y-8">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {(() => {
+                        const userApps = applications.filter(a => a.userId === selectedAdminUser.id);
+                        const totalBorrowed = userApps.filter(a => a.status === 'Approved' || a.status === 'Disbursed').reduce((acc, a) => acc + (a.amount || 0), 0);
+                        const activeLoansCount = userApps.filter(a => a.status === 'Approved' || a.status === 'Disbursed').length;
+                        return (
+                          <>
+                            <div className="p-5 md:p-6 bg-white dark:bg-slate-800/50 rounded-[2rem] md:rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-sm">
+                              <p className="text-[9px] text-gray-400 font-black tracking-[0.2em] uppercase mb-2">Total Borrowed</p>
+                              <p className="text-xl md:text-2xl font-bold font-display text-brand-blue dark:text-white">TSh {totalBorrowed.toLocaleString()}</p>
+                            </div>
+                            <div className="p-5 md:p-6 bg-amber-50/50 dark:bg-amber-500/10 rounded-[2rem] md:rounded-[2.5rem] border border-amber-100/50 dark:border-amber-500/10 shadow-sm">
+                              <p className="text-[9px] text-amber-600/60 font-black tracking-[0.2em] uppercase mb-2">Current Balance</p>
+                              <p className="text-xl md:text-2xl font-bold font-display text-amber-600">TSh {totalBorrowed.toLocaleString()}</p>
+                            </div>
+                            <div className="p-5 md:p-6 bg-emerald-50/50 dark:bg-emerald-500/10 rounded-[2rem] md:rounded-[2.5rem] border border-emerald-100/50 dark:border-emerald-500/10 shadow-sm">
+                              <p className="text-[9px] text-emerald-600/60 font-black tracking-[0.2em] uppercase mb-2">Active Loans</p>
+                              <p className="text-xl md:text-2xl font-bold font-display text-emerald-600">{activeLoansCount}</p>
+                            </div>
+                            <div className="p-5 md:p-6 bg-brand-blue/5 rounded-[2rem] md:rounded-[2.5rem] border border-brand-blue/10 dark:border-brand-blue/20 shadow-sm">
+                              <p className="text-[9px] text-brand-blue/60 font-black tracking-[0.2em] uppercase mb-2">{lang === 'sw' ? 'Marejesho' : 'Repayment'}</p>
+                              <p className="text-sm md:text-base font-bold font-display text-brand-blue dark:text-white">
+                                {userApps.length > 0 
+                                  ? new Date(new Date(userApps[0].timestamp).getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()
+                                  : 'N/A'}
+                              </p>
+                            </div>
+                          </>
+                        )
+                      })()}
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-8">
+                        <div className="flex items-center gap-3">
+                          <div className="w-1.5 h-6 bg-brand-gold rounded-full" />
+                          <h4 className="text-xs font-black uppercase tracking-[0.3em] text-gray-400">{lang === 'sw' ? 'Historia ya Mikopo' : 'Loan History'}</h4>
                         </div>
-                        <div className="p-5 md:p-6 bg-amber-50/50 dark:bg-amber-500/10 rounded-[2rem] md:rounded-[2.5rem] border border-amber-100/50 dark:border-amber-500/10 shadow-sm">
-                          <p className="text-[9px] text-amber-600/60 font-black tracking-[0.2em] uppercase mb-2">Current Balance</p>
-                          <p className="text-xl md:text-2xl font-bold font-display text-amber-600">TSh {totalBorrowed.toLocaleString()}</p>
-                        </div>
-                        <div className="p-5 md:p-6 bg-emerald-50/50 dark:bg-emerald-500/10 rounded-[2rem] md:rounded-[2.5rem] border border-emerald-100/50 dark:border-emerald-500/10 shadow-sm">
-                          <p className="text-[9px] text-emerald-600/60 font-black tracking-[0.2em] uppercase mb-2">Active Loans</p>
-                          <p className="text-xl md:text-2xl font-bold font-display text-emerald-600">{activeLoansCount}</p>
-                        </div>
-                        <div className="p-5 md:p-6 bg-brand-blue/5 rounded-[2rem] md:rounded-[2.5rem] border border-brand-blue/10 dark:border-brand-blue/20 shadow-sm">
-                          <p className="text-[9px] text-brand-blue/60 font-black tracking-[0.2em] uppercase mb-2">{lang === 'sw' ? 'Marejesho' : 'Repayment'}</p>
-                          <p className="text-sm md:text-base font-bold font-display text-brand-blue dark:text-white">
-                            {userApps.length > 0 
-                              ? new Date(new Date(userApps[0].timestamp).getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()
-                              : 'N/A'}
-                          </p>
-                        </div>
-                      </>
-                    )
-                  })()}
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-8">
-                    <div className="flex items-center gap-3">
-                      <div className="w-1.5 h-6 bg-brand-gold rounded-full" />
-                      <h4 className="text-xs font-black uppercase tracking-[0.3em] text-gray-400">{lang === 'sw' ? 'Historia ya Mikopo' : 'Loan History'}</h4>
+                      </div>
+                      <div className="space-y-4">
+                        {applications.filter(a => a.userId === selectedAdminUser.id).length > 0 ? (
+                          applications.filter(a => a.userId === selectedAdminUser.id).map(loan => (
+                            <div key={loan.id} className="p-5 bg-white dark:bg-slate-800/50 rounded-[2rem] border border-gray-100 dark:border-white/5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-white/5 transition-all shadow-sm">
+                              <div className="flex items-center gap-4">
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                                  loan.status === 'Approved' || loan.status === 'Disbursed' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10' : 
+                                  loan.status === 'Rejected' ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/10' : 'bg-amber-100 text-amber-600 dark:bg-amber-500/10'
+                                }`}>
+                                  <Building2 size={24} />
+                                </div>
+                                <div>
+                                  <p className="font-bold text-brand-blue dark:text-white text-base capitalize">{loan.loanType || 'General Loan'}</p>
+                                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{new Date(loan.timestamp).toLocaleDateString('en-GB')}</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-bold text-brand-blue dark:text-white text-base">TSh {(loan.amount || 0).toLocaleString()}</p>
+                                <span className={`inline-block px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest mt-1 ${
+                                  loan.status === 'Approved' || loan.status === 'Disbursed' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10' : 
+                                  loan.status === 'Rejected' ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/10' : 'bg-amber-100 text-amber-600 dark:bg-amber-500/10'
+                                }`}>{loan.status}</span>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-center py-20 bg-gray-50 dark:bg-white/5 rounded-[3rem] border-2 border-dashed border-gray-100 dark:border-white/5">
+                            <div className="w-16 h-16 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                              <History size={24} className="text-gray-300" />
+                            </div>
+                            <p className="text-sm font-bold text-gray-400">{lang === 'sw' ? 'Hakuna mikopo kwa mteja huyu' : 'No loans found for this user'}</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className="space-y-4">
-                    {applications.filter(a => a.userId === selectedAdminUser.id).length > 0 ? (
-                      applications.filter(a => a.userId === selectedAdminUser.id).map(loan => (
-                        <div key={loan.id} className="p-5 bg-white dark:bg-slate-800/50 rounded-[2rem] border border-gray-100 dark:border-white/5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-white/5 transition-all shadow-sm">
-                          <div className="flex items-center gap-4">
-                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
-                              loan.status === 'Approved' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10' : 
-                              loan.status === 'Rejected' ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/10' : 'bg-amber-100 text-amber-600 dark:bg-amber-500/10'
-                            }`}>
-                              <Building2 size={24} />
-                            </div>
-                            <div>
-                              <p className="font-bold text-brand-blue dark:text-white text-base capitalize">{loan.loanType || 'General Loan'}</p>
-                              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{new Date(loan.timestamp).toLocaleDateString('en-GB')}</p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-bold text-brand-blue dark:text-white text-base">TSh {(loan.amount || 0).toLocaleString()}</p>
-                            <span className={`inline-block px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest mt-1 ${
-                              loan.status === 'Approved' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10' : 
-                              loan.status === 'Rejected' ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/10' : 'bg-amber-100 text-amber-600 dark:bg-amber-500/10'
-                            }`}>{loan.status}</span>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-20 bg-gray-50 dark:bg-white/5 rounded-[3rem] border-2 border-dashed border-gray-100 dark:border-white/5">
-                        <div className="w-16 h-16 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
-                          <History size={24} className="text-gray-300" />
-                        </div>
-                        <p className="text-sm font-bold text-gray-400">{lang === 'sw' ? 'Hakuna mikopo kwa mteja huyu' : 'No loans found for this user'}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                )}
               </div>
 
               <div className="p-4 md:p-8 bg-gray-50/50 dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800 grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 shrink-0">
