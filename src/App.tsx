@@ -1026,7 +1026,7 @@ const RepaymentModal = ({ lang, loan, onClose }: { lang: Language, loan: any, on
     </motion.div>
   );
 };
-const Navbar = ({ lang, setLang, activeView, setActiveView, user, appConfig, setAppConfig, setShowingSupport, unreadCount, setShowNotifCenter, onLogin }: { lang: Language, setLang: (l: Language) => void, activeView: string, setActiveView: (v: string) => void, user: any, appConfig: AppConfig, setAppConfig: (c: AppConfig) => void, setShowingSupport: (s: boolean) => void, unreadCount: number, setShowNotifCenter: (n: boolean) => void, onLogin: () => void }) => {
+const Navbar = ({ lang, setLang, activeView, setActiveView, user, profileData, appConfig, setAppConfig, setShowingSupport, unreadCount, setShowNotifCenter, onLogin }: { lang: Language, setLang: (l: Language) => void, activeView: string, setActiveView: (v: string) => void, user: any, profileData: any, appConfig: AppConfig, setAppConfig: (c: AppConfig) => void, setShowingSupport: (s: boolean) => void, unreadCount: number, setShowNotifCenter: (n: boolean) => void, onLogin: () => void }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const t = translations[lang].nav;
@@ -1106,13 +1106,13 @@ const Navbar = ({ lang, setLang, activeView, setActiveView, user, appConfig, set
                     className="flex flex-col items-end group"
                   >
                     <span className={`text-[10px] font-black uppercase tracking-widest ${scrolled ? 'text-brand-blue/40' : 'text-white/40'} group-hover:text-brand-gold transition-colors`}>{lang === 'sw' ? 'Mteja' : 'Client'}</span>
-                    <span className={`text-xs font-bold leading-none ${scrolled ? 'text-brand-blue' : 'text-white'}`}>{user.displayName?.split(' ')[0]}</span>
+                    <span className={`text-xs font-bold leading-none ${scrolled ? 'text-brand-blue' : 'text-white'}`}>{(profileData?.fullName || user.displayName)?.split(' ')[0]}</span>
                   </button>
                   <button 
                     onClick={() => setActiveView('profile')}
                     className="w-10 h-10 rounded-full border-2 border-brand-gold/30 p-0.5 overflow-hidden hover:scale-110 transition-transform shadow-lg shadow-brand-blue/5"
                   >
-                    <img src={user.photoURL || `https://i.pravatar.cc/100?u=${user.uid}`} className="w-full h-full object-cover rounded-full" />
+                    <img src={profileData?.photoURL || user.photoURL || `https://i.pravatar.cc/100?u=${user.uid}`} className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
                   </button>
                   {ADMIN_EMAILS.includes(user.email || '') && (
                     <button 
@@ -1231,9 +1231,9 @@ const Navbar = ({ lang, setLang, activeView, setActiveView, user, appConfig, set
                   onClick={() => { setActiveView('profile'); setIsOpen(false); }}
                   className="flex items-center gap-4 bg-white/5 p-6 rounded-3xl"
                 >
-                  <img src={user.photoURL || `https://i.pravatar.cc/100?u=${user.uid}`} className="w-16 h-16 rounded-full border-2 border-brand-gold/30" />
+                  <img src={profileData?.photoURL || user.photoURL || `https://i.pravatar.cc/100?u=${user.uid}`} className="w-16 h-16 rounded-full border-2 border-brand-gold/30" referrerPolicy="no-referrer" />
                   <div className="text-left">
-                    <p className="text-white font-bold text-xl">{user.displayName || 'Client'}</p>
+                    <p className="text-white font-bold text-xl">{profileData?.fullName || user.displayName || 'Client'}</p>
                     <p className="text-brand-gold text-xs font-black uppercase tracking-widest">{lang === 'sw' ? 'Mteja' : 'Client'}</p>
                   </div>
                 </button>
@@ -1321,67 +1321,72 @@ const UserProfile = ({
   const activeLoans = applications.filter(a => a.status === 'Approved');
 
   return (
-    <div className="pt-24 md:pt-32 pb-20 bg-gray-50 dark:bg-slate-900 min-h-screen transition-colors">
+    <div className="pt-20 md:pt-32 pb-20 bg-gray-50 dark:bg-slate-900 min-h-screen transition-colors">
       {/* Floating Chat Button for Mobile */}
       <button 
         onClick={onChat}
-        className="fixed bottom-8 right-8 z-[60] w-16 h-16 bg-brand-gold text-brand-blue rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all lg:hidden"
+        className="fixed bottom-6 right-6 z-[60] w-14 h-14 bg-brand-gold text-brand-blue rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all lg:hidden border-4 border-white dark:border-slate-800"
       >
-        {showingChat ? <X size={28} /> : <MessagesSquare size={28} />}
+        {showingChat ? <X size={24} /> : <MessagesSquare size={24} />}
       </button>
 
       <div className="max-w-7xl mx-auto px-4 md:px-6">
-        <div className="grid lg:grid-cols-12 gap-8">
+        <div className="grid lg:grid-cols-12 gap-6 lg:gap-8">
           {/* Left Sidebar: Profile Info */}
-          <div className="lg:col-span-4 space-y-6">
+          <div className="lg:col-span-4 space-y-4 md:space-y-6">
             <motion.div 
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              className="bg-white dark:bg-slate-800 rounded-[2.5rem] md:rounded-[3rem] p-6 md:p-8 shadow-xl shadow-brand-blue/5 border border-white dark:border-white/5"
+              className="bg-white dark:bg-slate-800 rounded-[2.5rem] p-5 md:p-8 shadow-xl shadow-brand-blue/5 border border-white dark:border-white/5"
             >
-              <div className="text-center mb-6 md:mb-8">
-                <div className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-brand-gold/20 mx-auto mb-4 overflow-hidden p-1 shadow-inner bg-gray-50 dark:bg-slate-900">
+              <div className="text-center mb-4 md:mb-8">
+                <div className="w-20 h-20 md:w-32 md:h-32 rounded-full border-4 border-brand-gold/20 mx-auto mb-3 md:mb-4 overflow-hidden p-1 shadow-inner bg-gray-50 dark:bg-slate-900">
                    <img src={profileData?.photoURL || user.photoURL || `https://i.pravatar.cc/200?u=${user.uid}`} className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
                 </div>
-                <h2 className="text-xl md:text-2xl font-bold text-brand-blue dark:text-white truncate px-2">{profileData?.fullName || user.displayName}</h2>
-                <p className="text-gray-400 font-medium text-xs md:text-sm mb-2 truncate px-2">{user.email}</p>
+                <h2 className="text-lg md:text-2xl font-bold text-brand-blue dark:text-white truncate px-2 leading-tight">{profileData?.fullName || user.displayName}</h2>
+                <p className="text-gray-400 font-medium text-[10px] md:text-sm mb-2 truncate px-2">{user.email}</p>
                 {profileData?.gender && (
-                  <p className="text-[10px] font-black uppercase tracking-widest text-brand-gold bg-brand-gold/10 px-3 py-1 rounded-full inline-block mb-3">
-                    {profileData.gender === 'male' ? (lang === 'sw' ? 'Mwanaume' : 'Male') : 
-                     profileData.gender === 'female' ? (lang === 'sw' ? 'Mwanamke' : 'Female') : 
-                     (lang === 'sw' ? 'N.k' : 'Other')}
+                  <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-brand-gold bg-brand-gold/10 px-2.5 py-1 rounded-full inline-block mb-2 md:mb-3">
+                    {profileData.gender === 'male' ? (lang === 'sw' ? 'MWANAUME' : 'MALE') : 
+                     profileData.gender === 'female' ? (lang === 'sw' ? 'MWANAMKE' : 'FEMALE') : 
+                     (lang === 'sw' ? 'N.K' : 'OTHER')}
                   </p>
                 )}
-                <div></div>
-                <div className="mt-2 inline-flex items-center gap-2 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest">
-                  <ShieldCheck size={14} /> Verified Account
+                <div className="block"></div>
+                <div className="inline-flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 px-3 py-1 rounded-full text-[9px] md:text-xs font-bold uppercase tracking-widest border border-emerald-100 dark:border-emerald-500/20">
+                  <ShieldCheck size={12} className="md:size-3.5" /> VERIFIED ACCOUNT
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <button className="w-full flex items-center gap-4 p-4 rounded-2xl bg-brand-blue text-white shadow-lg shadow-brand-blue/20 font-bold transition-all hover:scale-[1.02] active:scale-95">
+              <div className="grid grid-cols-1 gap-2">
+                <button className="w-full flex items-center gap-3 p-3.5 md:p-4 rounded-2xl bg-brand-blue text-white shadow-lg shadow-brand-blue/20 font-bold text-xs md:text-sm transition-all hover:scale-[1.02] active:scale-95">
                   <LayoutDashboard size={18} /> {t.loanSummary}
                 </button>
-                <button onClick={() => downloadPDFStatement(user, applications, lang, appConfig)} className="w-full flex items-center gap-4 p-4 rounded-2xl text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 font-bold transition-all group">
-                  <Download size={18} className="group-hover:scale-110 transition-transform" /> {t.statement}
+                <div className="grid grid-cols-2 lg:grid-cols-1 gap-2">
+                  <button onClick={() => downloadPDFStatement(user, applications, lang, appConfig)} className="flex items-center gap-3 p-3 md:p-4 rounded-2xl text-emerald-600 bg-emerald-50/50 dark:bg-white/5 font-bold text-[10px] md:text-sm transition-all group">
+                    <Download size={16} className="md:size-[18px] group-hover:scale-110 transition-transform" /> {t.statement}
+                  </button>
+                  <button onClick={onChat} className={`flex items-center gap-3 p-3 md:p-4 rounded-2xl font-bold text-[10px] md:text-sm transition-all group ${showingChat ? 'bg-brand-gold/10 text-brand-gold' : 'text-gray-500 bg-gray-50/50 dark:bg-white/5 hover:bg-gray-50'}`}>
+                    <MessagesSquare size={16} className="md:size-[18px] group-hover:rotate-12 transition-transform" /> {lang === 'sw' ? 'Msaada' : 'Live Chat'}
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 lg:grid-cols-1 gap-2">
+                  <button onClick={onEdit} className="flex items-center gap-3 p-3 md:p-4 rounded-2xl text-gray-500 bg-gray-50/50 dark:bg-white/5 font-bold text-[10px] md:text-sm transition-all hover:text-brand-blue group">
+                    <User size={16} className="md:size-[18px] group-hover:scale-110 transition-transform" /> {lang === 'sw' ? 'Profaili' : 'Profile'}
+                  </button>
+                  <button onClick={onChangePassword} className="flex items-center gap-3 p-3 md:p-4 rounded-2xl text-gray-500 bg-gray-50/50 dark:bg-white/5 font-bold text-[10px] md:text-sm transition-all hover:text-brand-blue group">
+                    <Lock size={16} className="md:size-[18px] group-hover:scale-110 transition-transform" /> {lang === 'sw' ? 'Nywila' : 'Security'}
+                  </button>
+                </div>
+                <button onClick={onSignOut} className="w-full flex items-center gap-3 p-3.5 md:p-4 rounded-2xl text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-rose-500/10 font-bold text-[10px] md:text-sm transition-all border-t border-gray-100 dark:border-white/5 mt-2 group">
+                  <LogOut size={16} className="md:size-[18px] group-hover:translate-x-1 transition-transform" /> {lang === 'sw' ? 'Ondoka' : 'Sign Out'}
                 </button>
-                <button onClick={onChat} className={`w-full flex items-center gap-4 p-4 rounded-2xl font-bold transition-all group ${showingChat ? 'bg-brand-gold/10 text-brand-gold' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-white/5'}`}>
-                  <MessagesSquare size={18} className="group-hover:rotate-12 transition-transform" /> {lang === 'sw' ? 'Chat ya Msaada' : 'Live Chat'}
-                </button>
-                <button onClick={onEdit} className="w-full flex items-center gap-4 p-4 rounded-2xl text-gray-500 hover:bg-gray-50 dark:hover:bg-white/5 font-bold transition-all hover:text-brand-blue group">
-                  <User size={18} className="group-hover:scale-110 transition-transform" /> {lang === 'sw' ? 'Hariri Profaili' : 'Edit Profile'}
-                </button>
-                <button onClick={onChangePassword} className="w-full flex items-center gap-4 p-4 rounded-2xl text-gray-500 hover:bg-gray-50 dark:hover:bg-white/5 font-bold transition-all hover:text-brand-blue group">
-                  <Lock size={18} className="group-hover:scale-110 transition-transform" /> {lang === 'sw' ? 'Badili Nywila' : 'Change Password'}
-                </button>
-                <button onClick={onSignOut} className="w-full flex items-center gap-4 p-4 rounded-2xl text-gray-500 hover:bg-gray-100 dark:hover:bg-rose-500/10 font-bold transition-all border-t border-gray-100 dark:border-white/5 mt-4 group">
-                  <LogOut size={18} className="group-hover:translate-x-1 transition-transform" /> {lang === 'sw' ? 'Ondoka' : 'Sign Out'}
-                </button>
-                <button onClick={onDeleteAccount} className="w-full flex items-center gap-4 p-4 rounded-2xl text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 font-bold transition-all group mt-2">
-                  <Trash2 size={18} className="group-hover:scale-110 transition-transform" /> {lang === 'sw' ? 'Futa Akaunti' : 'Delete Account'}
+                <button onClick={onDeleteAccount} className="w-full flex items-center gap-3 p-3.5 md:p-4 rounded-2xl text-rose-600/60 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 font-bold text-[10px] transition-all group mt-1 opacity-50 hover:opacity-100">
+                  <Trash2 size={14} /> {lang === 'sw' ? 'Futa Akaunti' : 'Delete Account'}
                 </button>
               </div>
             </motion.div>
+
 
             {/* Chat for Desktop */}
             <div className="hidden lg:block">
@@ -1396,22 +1401,22 @@ const UserProfile = ({
           {/* Right Content: Dashboard */}
           <div className="lg:col-span-8">
             {showingChat && (
-              <div className="lg:hidden mb-8">
-                <SupportChat lang={lang} user={user} profileData={profileData} />
+              <div className="lg:hidden mb-6">
+                <SupportChat lang={lang} user={user} profileData={profileData} height="h-[400px]" />
               </div>
             )}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-8">
+            <div className="grid grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8">
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="bg-brand-blue p-6 md:p-8 rounded-[2.5rem] md:rounded-[3rem] text-white overflow-hidden relative shadow-2xl shadow-brand-blue/20"
+                className="bg-brand-blue p-5 md:p-8 rounded-[2.5rem] text-white overflow-hidden relative shadow-xl shadow-brand-blue/20"
               >
-                <Wallet className="absolute top-[-10%] right-[-10%] w-32 md:w-48 h-32 md:h-48 text-white/5" />
-                <p className="text-white/60 font-bold uppercase tracking-widest text-[9px] md:text-[10px] mb-2">{t.activeLoans}</p>
-                <h3 className="text-3xl md:text-4xl font-bold mb-4 tracking-tight">{activeLoans.length}</h3>
-                <div className="flex items-center gap-2 text-brand-gold text-xs md:text-sm font-black group cursor-pointer">
-                  <ChevronRight size={14} md:size={16} className="group-hover:translate-x-1 transition-transform" /> Manage Loans
+                <Wallet className="absolute top-[-10%] right-[-10%] w-24 md:w-48 h-24 md:h-48 text-white/5" />
+                <p className="text-white/60 font-bold uppercase tracking-widest text-[8px] md:text-[10px] mb-1 md:mb-2">{t.activeLoans}</p>
+                <h3 className="text-2xl md:text-4xl font-bold mb-3 md:mb-4 tracking-tight">{activeLoans.length}</h3>
+                <div className="flex items-center gap-1.5 text-brand-gold text-[10px] md:text-sm font-black group cursor-pointer">
+                  <ChevronRight size={12} className="group-hover:translate-x-1 transition-transform" /> Manage
                 </div>
               </motion.div>
 
@@ -1419,13 +1424,13 @@ const UserProfile = ({
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="bg-brand-gold p-6 md:p-8 rounded-[2.5rem] md:rounded-[3rem] text-brand-blue overflow-hidden relative shadow-2xl shadow-brand-gold/20"
+                className="bg-brand-gold p-5 md:p-8 rounded-[2.5rem] text-brand-blue overflow-hidden relative shadow-xl shadow-brand-gold/20"
               >
-                <Clock className="absolute top-[-10%] right-[-10%] w-32 md:w-48 h-32 md:h-48 text-brand-blue/5" />
-                <p className="text-brand-blue/60 font-bold uppercase tracking-widest text-[9px] md:text-[10px] mb-2">{t.nextPayment}</p>
-                <h3 className="text-2xl md:text-3xl font-bold mb-4 tracking-tight">TSh 150,000</h3>
-                <div className="flex items-center gap-2 text-brand-blue text-xs md:text-sm font-black">
-                  <Calendar size={14} md:size={16} /> 24 May 2024
+                <Clock className="absolute top-[-10%] right-[-10%] w-24 md:w-48 h-24 md:h-48 text-brand-blue/5" />
+                <p className="text-brand-blue/60 font-bold uppercase tracking-widest text-[8px] md:text-[10px] mb-1 md:mb-2">{t.nextPayment}</p>
+                <h3 className="text-lg md:text-3xl font-bold mb-3 md:mb-4 tracking-tight leading-none">TSh 150k</h3>
+                <div className="flex items-center gap-1.5 text-brand-blue text-[10px] md:text-sm font-black">
+                  <Calendar size={12} /> 24 May 24
                 </div>
               </motion.div>
             </div>
@@ -1435,20 +1440,20 @@ const UserProfile = ({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
-              className="mb-8 bg-emerald-500 p-6 md:p-8 rounded-[2.5rem] md:rounded-[3rem] text-white overflow-hidden relative shadow-2xl shadow-emerald-500/20"
+              className="mb-6 md:mb-8 bg-emerald-500 p-6 md:p-8 rounded-[2.5rem] text-white overflow-hidden relative shadow-xl shadow-emerald-500/20"
             >
-              <Users className="absolute top-[-10%] right-[-10%] w-32 md:w-48 h-32 md:h-48 text-white/5" />
-              <p className="text-white/60 font-bold uppercase tracking-widest text-[9px] md:text-[10px] mb-2">{lang === 'sw' ? 'MUALIKE RAFIKI' : 'REFER A FRIEND'}</p>
-              <h3 className="text-lg md:text-xl font-bold mb-2">{lang === 'sw' ? 'Mualike Rafiki, Pata Zawadi' : 'Refer a Friend, Get Rewards'}</h3>
-              <p className="text-[10px] md:text-xs opacity-80 mb-4">{lang === 'sw' ? 'Shiriki namba yako ya upatanishi na marafiki kupata punguzo la riba.' : 'Share your referral code with friends to get interest discounts.'}</p>
-              <div className="flex items-center gap-2 bg-white/10 p-3 rounded-xl border border-white/20">
-                <code className="flex-1 font-mono font-bold tracking-widest">{user.uid.slice(0, 8).toUpperCase()}</code>
+              <Users className="absolute top-[-10%] right-[-10%] w-24 md:w-48 h-24 md:h-48 text-white/5" />
+              <p className="text-white/60 font-bold uppercase tracking-widest text-[8px] md:text-[10px] mb-1 md:mb-2">{lang === 'sw' ? 'MUALIKE RAFIKI' : 'REFER A FRIEND'}</p>
+              <h3 className="text-base md:text-xl font-bold mb-1 md:mb-2 leading-tight">{lang === 'sw' ? 'Mualike Rafiki, Pata Zawadi' : 'Refer a Friend, Get Rewards'}</h3>
+              <p className="text-[9px] md:text-xs opacity-80 mb-4 max-w-xs">{lang === 'sw' ? 'Shiriki namba yako ya upatanishi na marafiki kupata punguzo la riba.' : 'Share your referral code with friends to get interest discounts.'}</p>
+              <div className="flex items-center gap-2 bg-white/10 p-2 md:p-3 rounded-2xl border border-white/20 backdrop-blur-sm">
+                <code className="flex-1 font-mono font-bold tracking-widest text-sm md:text-base px-2">{user.uid.slice(0, 8).toUpperCase()}</code>
                 <button 
                   onClick={() => {
                     navigator.clipboard.writeText(user.uid.slice(0, 8).toUpperCase());
                     alert(lang === 'sw' ? 'Imenakiliwa!' : 'Copied!');
                   }}
-                  className="bg-white text-emerald-600 px-4 py-1.5 rounded-lg text-[10px] font-black uppercase hover:bg-emerald-50 transition-colors"
+                  className="bg-white text-emerald-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-emerald-50 transition-colors shadow-sm"
                 >
                   {lang === 'sw' ? 'NAKILI' : 'COPY'}
                 </button>
@@ -1475,24 +1480,24 @@ const UserProfile = ({
                   </div>
                 ) : (
                   applications.slice(0, 10).map((app, i) => (
-                    <div key={app.id || i} className="flex flex-col sm:flex-row sm:items-center justify-between p-5 md:p-6 rounded-3xl bg-gray-50 dark:bg-slate-900/50 hover:bg-brand-blue/5 dark:hover:bg-brand-blue/10 border border-transparent hover:border-brand-blue/10 transition-all group gap-4">
-                      <div className="flex items-center gap-3 md:gap-4">
-                        <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${
+                    <div key={app.id || i} className="flex items-center justify-between p-4 md:p-6 rounded-3xl bg-gray-50 dark:bg-slate-900/50 hover:bg-brand-blue/5 dark:hover:bg-brand-blue/10 border border-transparent hover:border-brand-blue/10 transition-all group gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110 ${
                           app.status === 'Approved' || app.status === 'Disbursed' ? 'bg-green-100 dark:bg-green-500/10 text-green-600' : 
                           app.status === 'Rejected' ? 'bg-red-100 dark:bg-red-500/10 text-red-600' : 'bg-amber-100 dark:bg-amber-500/10 text-amber-600'
                         }`}>
-                          {(app.status === 'Approved' || app.status === 'Disbursed') ? <CheckCircle2 size={20} md:size={24} /> : 
-                           app.status === 'Rejected' ? <XCircle size={20} md:size={24} /> : <Clock size={20} md:size={24} />}
+                          {(app.status === 'Approved' || app.status === 'Disbursed') ? <CheckCircle2 size={18} md:size={24} /> : 
+                           app.status === 'Rejected' ? <XCircle size={18} md:size={24} /> : <Clock size={18} md:size={24} />}
                         </div>
-                        <div>
-                          <p className="font-bold text-brand-blue dark:text-white tracking-tight text-sm md:text-base">{app.loanType || 'General Loan'}</p>
-                          <p className="text-[9px] md:text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">{new Date(app.timestamp).toLocaleDateString()}</p>
+                        <div className="min-w-0">
+                          <p className="font-bold text-brand-blue dark:text-white tracking-tight text-xs md:text-base truncate">{app.loanType || 'General Loan'}</p>
+                          <p className="text-[8px] md:text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none mt-0.5">{new Date(app.timestamp).toLocaleDateString()}</p>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between sm:justify-end gap-4 md:gap-6">
-                        <div className="text-left sm:text-right">
-                          <p className="font-black text-brand-blue dark:text-white text-sm md:text-base">TSh {Number(app.amount).toLocaleString()}</p>
-                          <span className={`text-[8px] md:text-[10px] font-black uppercase px-2 md:px-3 py-0.5 md:py-1 rounded-full ${
+                      <div className="flex items-center gap-3 md:gap-6 shrink-0">
+                        <div className="text-right">
+                          <p className="font-black text-brand-blue dark:text-white text-xs md:text-base">TSh {Math.round(Number(app.amount) / 1000)}k</p>
+                          <span className={`text-[7px] md:text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
                             app.status === 'Approved' || app.status === 'Disbursed' ? 'bg-green-500 text-white' : 
                             app.status === 'Rejected' ? 'bg-red-500 text-white' : 'bg-amber-500 text-white'
                           }`}>
@@ -1503,9 +1508,10 @@ const UserProfile = ({
                         {(app.status === 'Approved' || app.status === 'Disbursed') && (
                           <button 
                             onClick={() => onRepay(app)}
-                            className="bg-brand-gold text-brand-blue px-3 md:px-4 py-1.5 md:py-2 rounded-xl font-bold text-[10px] md:text-xs shadow-lg shadow-brand-gold/20 hover:scale-105 transition-transform"
+                            className="bg-brand-gold text-brand-blue p-2 md:px-4 md:py-2 rounded-xl font-bold text-[9px] md:text-xs shadow-lg shadow-brand-gold/20 hover:scale-105 transition-transform"
                           >
-                            {t.repay}
+                            <CreditCard size={14} className="md:hidden" />
+                            <span className="hidden md:inline">{t.repay}</span>
                           </button>
                         )}
                       </div>
@@ -2698,6 +2704,7 @@ export default function App() {
         activeView={activeView} 
         setActiveView={setActiveView} 
         user={user} 
+        profileData={profileData} 
         appConfig={appConfig}
         setAppConfig={setAppConfig}
         setShowingSupport={setShowingSupport}
@@ -4688,7 +4695,7 @@ export default function App() {
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 20 }}
-              className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20"
+              className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-8 shadow-2xl relative z-10 border border-white/20"
             >
               <h3 className="text-xl font-display font-bold text-brand-blue dark:text-white mb-6">
                 {lang === 'sw' ? 'Hariri Taarifa' : 'Edit Information'}
@@ -4826,7 +4833,7 @@ export default function App() {
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 20 }}
-              className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20"
+              className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-8 shadow-2xl relative z-10 border border-white/20"
             >
               <h3 className="text-xl font-display font-bold text-brand-blue dark:text-white mb-6">
                 {lang === 'sw' ? 'Badili Nywila' : 'Change Password'}
@@ -4890,7 +4897,7 @@ export default function App() {
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 20 }}
-              className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-white/20"
+              className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-8 shadow-2xl relative z-10 border border-white/20"
             >
               <h3 className="text-xl font-display font-bold text-brand-blue dark:text-white mb-6">
                 {lang === 'sw' ? 'Msaada na Huduma' : 'Help & Support'}
@@ -4982,15 +4989,14 @@ export default function App() {
                       </div>
                     </div>
                   </div>
-                  <button 
-                    onClick={() => {
-                      setShowingChat(true);
-                      // In admin view, chat needs targetUserId
-                    }}
-                    className={`py-3 md:py-5 px-6 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 border border-brand-blue/10 hover:bg-brand-blue hover:text-white transition-all ${showingChat ? 'bg-brand-blue text-white' : 'text-brand-blue'}`}
-                  >
-                    <MessagesSquare size={18} /> {lang === 'sw' ? 'Message' : 'Message'}
-                  </button>
+                    <button 
+                      onClick={() => {
+                        setShowingChat(true);
+                      }}
+                      className={`py-2 px-4 rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center gap-2 border border-brand-blue/10 hover:bg-brand-blue hover:text-white transition-all text-brand-blue`}
+                    >
+                      <MessagesSquare size={14} /> {lang === 'sw' ? 'Mjumbe' : 'Message'}
+                    </button>
                   <button onClick={() => setSelectedAdminUser(null)} className="p-3 md:p-4 bg-gray-50 dark:bg-white/5 rounded-2xl text-gray-400 hover:text-rose-500 transition-all">
                     <X size={20} md:size={24} />
                   </button>
@@ -5394,8 +5400,14 @@ export default function App() {
             </button>
             
             <button onClick={() => setActiveView(user ? 'profile' : 'auth')} className={`flex flex-col items-center transition-all duration-300 relative z-10 ${activeView === 'profile' || activeView === 'auth' ? 'scale-110 text-brand-gold' : 'opacity-50 hover:opacity-100'}`}>
-               <User size={22} strokeWidth={activeView === 'profile' || activeView === 'auth' ? 2.5 : 2} />
-               <span className="text-[7px] font-black mt-1.5 uppercase tracking-[0.2em]">{lang === 'sw' ? 'Akaunti' : 'Akaunti'}</span>
+               {user ? (
+                 <div className="w-6 h-6 rounded-full border border-white/20 overflow-hidden">
+                   <img src={profileData?.photoURL || user.photoURL || `https://i.pravatar.cc/100?u=${user.uid}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                 </div>
+               ) : (
+                 <User size={22} strokeWidth={activeView === 'profile' || activeView === 'auth' ? 2.5 : 2} />
+               )}
+               <span className="text-[7px] font-black mt-1.5 uppercase tracking-[0.2em]">{lang === 'sw' ? 'Akaunti' : 'Account'}</span>
                {(activeView === 'profile' || activeView === 'auth') && <motion.div layoutId="nav-glow" className="absolute -bottom-2 w-1 h-1 bg-brand-gold rounded-full shadow-[0_0_10px_#D4AF37]" />}
             </button>
          </div>
