@@ -1299,6 +1299,7 @@ const UserProfile = ({
   onDeleteAccount,
   onRepay,
   onChat,
+  onShowTour,
   showingChat,
   appConfig
 }: { 
@@ -1314,6 +1315,7 @@ const UserProfile = ({
   onDeleteAccount: () => void,
   onRepay: (loan: any) => void,
   onChat: () => void,
+  onShowTour: () => void,
   showingChat: boolean,
   appConfig: AppConfig
 }) => {
@@ -1374,10 +1376,13 @@ const UserProfile = ({
                   <button onClick={onEdit} className="flex items-center gap-3 p-3 md:p-4 rounded-2xl text-gray-500 bg-gray-50/50 dark:bg-white/5 font-bold text-[10px] md:text-sm transition-all hover:text-brand-blue group">
                     <User size={16} className="md:size-[18px] group-hover:scale-110 transition-transform" /> {lang === 'sw' ? 'Profaili' : 'Profile'}
                   </button>
-                  <button onClick={onChangePassword} className="flex items-center gap-3 p-3 md:p-4 rounded-2xl text-gray-500 bg-gray-50/50 dark:bg-white/5 font-bold text-[10px] md:text-sm transition-all hover:text-brand-blue group">
-                    <Lock size={16} className="md:size-[18px] group-hover:scale-110 transition-transform" /> {lang === 'sw' ? 'Nywila' : 'Security'}
+                  <button onClick={onShowTour} className="flex items-center gap-3 p-3 md:p-4 rounded-2xl text-gray-500 bg-gray-50/50 dark:bg-white/5 font-bold text-[10px] md:text-sm transition-all hover:text-brand-blue group">
+                    <Sparkles size={16} className="md:size-[18px] group-hover:scale-110 transition-transform" /> {lang === 'sw' ? 'Mwongozo' : 'Tour'}
                   </button>
                 </div>
+                <button onClick={onChangePassword} className="w-full flex items-center gap-3 p-3.5 md:p-4 rounded-2xl text-gray-500 bg-gray-50/50 dark:bg-white/5 font-bold text-[10px] md:text-sm transition-all hover:text-brand-blue group">
+                  <Lock size={16} className="md:size-[18px] group-hover:scale-110 transition-transform" /> {lang === 'sw' ? 'Usalama wa Akaunti' : 'Account Security'}
+                </button>
                 <button onClick={onSignOut} className="w-full flex items-center gap-3 p-3.5 md:p-4 rounded-2xl text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-rose-500/10 font-bold text-[10px] md:text-sm transition-all border-t border-gray-100 dark:border-white/5 mt-2 group">
                   <LogOut size={16} className="md:size-[18px] group-hover:translate-x-1 transition-transform" /> {lang === 'sw' ? 'Ondoka' : 'Sign Out'}
                 </button>
@@ -2475,6 +2480,15 @@ export default function App() {
     totalUsers: allUsers.length
   };
 
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState(0);
+
+  useEffect(() => {
+    if (user && profileData && profileData.hasSeenOnboarding !== true && activeView === 'profile') {
+      setShowOnboarding(true);
+    }
+  }, [user, profileData, activeView]);
+
   const filteredLoans = applications.filter(a => 
     a.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
     a.loanType?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -2663,7 +2677,8 @@ export default function App() {
               photoURL: u.photoURL,
               phone: '',
               createdAt: new Date().toISOString(),
-              unreadByAdmin: true // Notification for admin
+              unreadByAdmin: true, // Notification for admin
+              hasSeenOnboarding: false
             };
             const { collection, addDoc } = await import('firebase/firestore');
             await setDoc(docRef, newProfile);
@@ -2698,6 +2713,154 @@ export default function App() {
 
   return (
     <div className="font-sans antialiased text-brand-dark bg-brand-light min-h-screen scroll-smooth overflow-x-hidden selection:bg-brand-gold/30 selection:text-brand-blue">
+      {/* Onboarding Overlay */}
+      <AnimatePresence>
+        {showOnboarding && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-brand-blue/20 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl relative border border-white/20 overflow-hidden"
+            >
+              {/* Background Accents */}
+              <div className="absolute -top-24 -right-24 w-48 h-48 bg-brand-gold/10 rounded-full blur-3xl" />
+              <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-brand-blue/10 rounded-full blur-3xl" />
+
+              <div className="relative z-10">
+                <div className="flex justify-between items-center mb-8">
+                   <div className="flex items-center gap-3">
+                     <div className="w-10 h-10 bg-brand-blue/5 dark:bg-white/5 rounded-2xl flex items-center justify-center text-brand-gold">
+                       <Sparkles size={20} />
+                     </div>
+                     <div>
+                       <h3 className="font-bold text-brand-blue dark:text-white">{lang === 'sw' ? 'Mwongozo wa Haraka' : 'Platform Tour'}</h3>
+                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{lang === 'sw' ? 'Hatua' : 'Step'} {onboardingStep + 1} of 4</p>
+                     </div>
+                   </div>
+                   <button 
+                    onClick={async () => {
+                      setShowOnboarding(false);
+                      if (user) {
+                        const { doc, updateDoc } = await import('firebase/firestore');
+                        const { db } = await import('./lib/firebase');
+                        await updateDoc(doc(db, 'users', user.uid), { hasSeenOnboarding: true });
+                      }
+                    }}
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-xl transition-colors text-gray-400"
+                   >
+                     <X size={20} />
+                   </button>
+                </div>
+
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={onboardingStep}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="min-h-[160px]"
+                  >
+                    {onboardingStep === 0 && (
+                      <div className="space-y-4">
+                        <div className="w-16 h-16 bg-brand-blue text-white rounded-2xl flex items-center justify-center shadow-lg shadow-brand-blue/20">
+                          <HandCoins size={32} />
+                        </div>
+                        <h4 className="text-2xl font-bold text-brand-blue dark:text-white leading-tight">
+                          {lang === 'sw' ? 'Karibu Coshve Finance!' : 'Welcome to Coshve Finance!'}
+                        </h4>
+                        <p className="text-gray-500 dark:text-gray-400 leading-relaxed text-sm">
+                          {lang === 'sw' ? 'Sisi ni wenzi wako katika kufikia malengo ya kifedha. Jukwaa hili limeundwa kufanya upatikanaji wa mikopo uwe rahisi, haraka, na salama.' : 'We are your partners in achieving financial goals. This platform is designed to make loan access easy, fast, and secure.'}
+                        </p>
+                      </div>
+                    )}
+                    {onboardingStep === 1 && (
+                      <div className="space-y-4">
+                        <div className="w-16 h-16 bg-brand-gold text-brand-blue rounded-2xl flex items-center justify-center shadow-lg shadow-brand-gold/20">
+                          <LayoutDashboard size={32} />
+                        </div>
+                        <h4 className="text-2xl font-bold text-brand-blue dark:text-white leading-tight">
+                          {lang === 'sw' ? 'Muhtasari wa Akaunti' : 'Dashboard Overview'}
+                        </h4>
+                        <p className="text-gray-500 dark:text-gray-400 leading-relaxed text-sm">
+                          {lang === 'sw' ? 'Hapa unaweza kuona hali ya mikopo yako ya sasa, historia ya maombi, na tarehe za malipo zinazofuata.' : 'Here you can see the status of your current loans, application history, and upcoming payment dates.'}
+                        </p>
+                      </div>
+                    )}
+                    {onboardingStep === 2 && (
+                      <div className="space-y-4">
+                        <div className="w-16 h-16 bg-emerald-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                          <PenTool size={32} />
+                        </div>
+                        <h4 className="text-2xl font-bold text-brand-blue dark:text-white leading-tight">
+                          {lang === 'sw' ? 'Kuomba Mkopo' : 'Applying for a Loan'}
+                        </h4>
+                        <p className="text-gray-500 dark:text-gray-400 leading-relaxed text-sm">
+                          {lang === 'sw' ? 'Unapohitaji mtaji au msaada wa kifedha, bonyeza "Services" au "Apply Now" ili kuona bidhaa zetu mbalimbali na kuanza maombi.' : 'When you need capital or financial assistance, click "Services" or "Apply Now" to see our various products and start an application.'}
+                        </p>
+                      </div>
+                    )}
+                    {onboardingStep === 3 && (
+                      <div className="space-y-4">
+                        <div className="w-16 h-16 bg-brand-blue text-white rounded-2xl flex items-center justify-center shadow-lg shadow-brand-blue/20">
+                          <MessagesSquare size={32} />
+                        </div>
+                        <h4 className="text-2xl font-bold text-brand-blue dark:text-white leading-tight">
+                          {lang === 'sw' ? 'Msaada wa Moja kwa Moja' : 'Live Support'}
+                        </h4>
+                        <p className="text-gray-500 dark:text-gray-400 leading-relaxed text-sm">
+                          {lang === 'sw' ? 'Una swali au unahitaji msaada? Timu yetu inapatikana kupitia chat ya moja kwa moja masaa yote ya kazi.' : 'Have a question or need help? Our team is available through live chat during all business hours.'}
+                        </p>
+                      </div>
+                    )}
+                  </motion.div>
+                </AnimatePresence>
+
+                <div className="mt-10 flex items-center justify-between">
+                  <div className="flex gap-1.5">
+                    {[0, 1, 2, 3].map((s) => (
+                      <div 
+                        key={s} 
+                        className={`h-1 rounded-full transition-all duration-500 ${onboardingStep === s ? 'w-8 bg-brand-gold' : 'w-2 bg-gray-200 dark:bg-white/10'}`}
+                      />
+                    ))}
+                  </div>
+
+                  <div className="flex gap-3">
+                    {onboardingStep > 0 && (
+                      <button 
+                        onClick={() => setOnboardingStep(onboardingStep - 1)}
+                        className="px-6 py-3 rounded-2xl font-bold text-gray-400 hover:text-brand-blue transition-colors text-sm"
+                      >
+                        {lang === 'sw' ? 'Nyuma' : 'Back'}
+                      </button>
+                    )}
+                    <button 
+                      onClick={async () => {
+                        if (onboardingStep < 3) {
+                          setOnboardingStep(onboardingStep + 1);
+                        } else {
+                          setShowOnboarding(false);
+                          if (user) {
+                            const { doc, updateDoc } = await import('firebase/firestore');
+                            const { db } = await import('./lib/firebase');
+                            await updateDoc(doc(db, 'users', user.uid), { hasSeenOnboarding: true });
+                          }
+                        }
+                      }}
+                      className="bg-brand-blue text-white px-8 py-3 rounded-2xl font-bold shadow-lg shadow-brand-blue/20 hover:scale-105 active:scale-95 transition-all text-sm flex items-center gap-2"
+                    >
+                      {onboardingStep === 3 ? (lang === 'sw' ? 'Nimeelewa' : "Got it") : (lang === 'sw' ? 'Endelea' : 'Next')}
+                      <ChevronRight size={18} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <Navbar 
         lang={lang} 
         setLang={setLang} 
@@ -2828,6 +2991,10 @@ export default function App() {
                 onDeleteAccount={() => setIsDeletingAccount(true)}
                 onRepay={(loan) => setRepayingLoan(loan)}
                 onChat={() => setShowingChat(!showingChat)}
+                onShowTour={() => {
+                  setOnboardingStep(0);
+                  setShowOnboarding(true);
+                }}
                 showingChat={showingChat}
                 appConfig={appConfig}
               />
