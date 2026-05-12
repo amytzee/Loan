@@ -265,7 +265,7 @@ interface LoanProduct {
 // --- Translations Data ---
 const translations: Record<Language, Translation> = {
   sw: {
-    nav: { home: 'Nyumbani', services: 'Huduma', about: 'Kuhusu', process: 'Mchakato', apply: 'Omba Mkopo', login: 'Ingia', register: 'Jiunge' },
+    nav: { home: 'Nyumbani', services: 'Mkopo', about: 'Kuhusu', process: 'Mchakato', apply: 'Omba Mkopo', login: 'Ingia', register: 'Jiunge' },
     hero: {
       badge: 'Tier 2 Microfinance • Leseni ya BoT',
       title: 'Tabasamu',
@@ -346,7 +346,7 @@ const translations: Record<Language, Translation> = {
       loanSummary: 'Muhtasari wa Mkopo',
       activeLoans: 'Mikopo Amilifu',
       nextPayment: 'Malipo Yajayo',
-      history: 'Mikopo Yangu',
+      history: 'CHAGUA HUDUMA',
       status: 'Hali ya Mkopo',
       notifs: 'Taarifa',
       settings: 'Mipangilio',
@@ -355,7 +355,7 @@ const translations: Record<Language, Translation> = {
     }
   },
   en: {
-    nav: { home: 'Home', services: 'Services', about: 'About', process: 'Process', apply: 'Apply Now', login: 'Login', register: 'Sign Up' },
+    nav: { home: 'Home', services: 'Mkopo', about: 'About', process: 'Process', apply: 'Apply Now', login: 'Login', register: 'Sign Up' },
     hero: {
       badge: 'Tier 2 Microfinance • BoT Licensed',
       title: 'Your',
@@ -1243,7 +1243,7 @@ const Navbar = ({ lang, setLang, activeView, setActiveView, user, profileData, a
               )}
             </div>
             <div className="mt-auto opacity-40 text-white text-[10px] font-black uppercase tracking-[0.3em] text-center">
-              Licensed Microfince • BoT
+              Coshve Finance
             </div>
           </motion.div>
         )}
@@ -3088,7 +3088,7 @@ export default function App() {
               className="max-w-xl mx-auto px-4"
             >
               <button onClick={() => setActiveView('services')} className="mb-8 flex items-center gap-2 text-gray-400 font-bold text-xs uppercase tracking-widest hover:text-brand-blue transition-colors">
-                <ChevronRight size={16} className="rotate-180" /> Back to Loans
+                <ChevronRight size={16} className="rotate-180" /> {lang === 'sw' ? 'Rudi Kwenye Mikopo' : 'Back to Loans'}
               </button>
 
               <div className="app-card space-y-8">
@@ -3385,8 +3385,8 @@ export default function App() {
             >
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
                 <div>
-                  <h1 className="text-2xl font-display font-bold text-brand-blue">{ADMIN_EMAILS.includes(user?.email || '') ? 'Admin Dashboard' : (lang === 'sw' ? 'Mikopo' : 'My Loans')}</h1>
-                  <p className="text-sm text-gray-500">{ADMIN_EMAILS.includes(user?.email || '') ? 'Monitor all system activities' : (lang === 'sw' ? 'Marekebisho ya papo hapo ya maombi yako' : 'Real-time update of your requests')}</p>
+                  <h1 className="text-2xl font-display font-bold text-brand-blue">{ADMIN_EMAILS.includes(user?.email || '') ? 'Admin Dashboard' : (lang === 'sw' ? 'CHAGUA HUDUMA' : 'My Loans')}</h1>
+                  <p className="text-sm text-gray-500">{ADMIN_EMAILS.includes(user?.email || '') ? 'Monitor all system activities' : (lang === 'sw' ? 'Chagua mpango bora kwa mahitaji yako' : 'Real-time update of your requests')}</p>
                 </div>
                 {user && ADMIN_EMAILS.includes(user?.email || '') && (
                   <div className="flex flex-col sm:flex-row gap-4">
@@ -5259,7 +5259,7 @@ export default function App() {
                       <div className="flex items-center justify-between mb-8">
                         <div className="flex items-center gap-3">
                           <div className="w-1.5 h-6 bg-brand-gold rounded-full" />
-                          <h4 className="text-xs font-black uppercase tracking-[0.3em] text-gray-400">{lang === 'sw' ? 'Historia ya Mikopo' : 'Loan History'}</h4>
+                          <h4 className="text-xs font-black uppercase tracking-[0.3em] text-gray-400">{lang === 'sw' ? 'CHAGUA HUDUMA' : 'Loan History'}</h4>
                         </div>
                       </div>
                       <div className="space-y-4">
