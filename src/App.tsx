@@ -1207,6 +1207,14 @@ const Navbar = ({ lang, setLang, activeView, setActiveView, user, profileData, a
                 onClick={() => { setActiveView('services'); setIsOpen(false); }}
                 className="block text-4xl font-display font-bold text-white hover:text-brand-gold transition-colors"
               >{t.services}</button>
+              
+              {user && ADMIN_EMAILS.includes(user.email || '') && (
+                <button 
+                  onClick={() => { setActiveView('history'); setIsOpen(false); }}
+                  className="block text-4xl font-display font-bold text-brand-gold hover:text-white transition-colors"
+                >{lang === 'sw' ? 'Admin Dashboard' : 'Admin Panel'}</button>
+              )}
+
               <button 
                 onClick={() => { setShowingSupport(true); setIsOpen(false); }}
                 className="block text-4xl font-display font-bold text-white hover:text-brand-gold transition-colors"
@@ -1303,6 +1311,7 @@ const UserProfile = ({
   onRepay,
   onChat,
   onShowTour,
+  setActiveView,
   showingChat,
   appConfig
 }: { 
@@ -1319,6 +1328,7 @@ const UserProfile = ({
   onRepay: (loan: any) => void,
   onChat: () => void,
   onShowTour: () => void,
+  setActiveView: (view: string) => void,
   showingChat: boolean,
   appConfig: AppConfig
 }) => {
@@ -1364,6 +1374,14 @@ const UserProfile = ({
               </div>
 
               <div className="grid grid-cols-1 gap-2">
+                {ADMIN_EMAILS.includes(user.email || '') && (
+                  <button 
+                    onClick={() => setActiveView('history')}
+                    className="w-full flex items-center gap-3 p-3.5 md:p-4 rounded-2xl bg-brand-gold text-brand-blue shadow-lg shadow-brand-gold/20 font-bold text-xs md:text-sm transition-all hover:scale-[1.02] active:scale-95 mb-1"
+                  >
+                    <LayoutDashboard size={18} /> {lang === 'sw' ? 'Admin Dashboard' : 'Admin Dashboard'}
+                  </button>
+                )}
                 <button className="w-full flex items-center gap-3 p-3.5 md:p-4 rounded-2xl bg-brand-blue text-white shadow-lg shadow-brand-blue/20 font-bold text-xs md:text-sm transition-all hover:scale-[1.02] active:scale-95">
                   <LayoutDashboard size={18} /> {t.loanSummary}
                 </button>
@@ -3001,6 +3019,7 @@ export default function App() {
                   setOnboardingStep(0);
                   setShowOnboarding(true);
                 }}
+                setActiveView={setActiveView}
                 showingChat={showingChat}
                 appConfig={appConfig}
               />
@@ -5607,10 +5626,10 @@ export default function App() {
                {activeView === 'home' && <motion.div layoutId="nav-glow" className="absolute -bottom-2 w-1 h-1 bg-brand-gold rounded-full shadow-[0_0_10px_#D4AF37]" />}
             </button>
             
-            <button onClick={() => setActiveView('services')} className={`flex flex-col items-center transition-all duration-300 relative z-10 ${activeView === 'services' || activeView === 'apply' ? 'scale-110 text-brand-gold' : 'opacity-50 hover:opacity-100'}`}>
-               <LayoutDashboard size={22} strokeWidth={activeView === 'services' || activeView === 'apply' ? 2.5 : 2} />
-               <span className="text-[7px] font-black mt-1.5 uppercase tracking-[0.2em]">{lang === 'sw' ? 'Mkopo' : 'Services'}</span>
-               {(activeView === 'services' || activeView === 'apply') && <motion.div layoutId="nav-glow" className="absolute -bottom-2 w-1 h-1 bg-brand-gold rounded-full shadow-[0_0_10px_#D4AF37]" />}
+            <button onClick={() => setActiveView(user && ADMIN_EMAILS.includes(user.email || '') ? 'history' : 'services')} className={`flex flex-col items-center transition-all duration-300 relative z-10 ${(activeView === 'services' || activeView === 'history' || activeView === 'apply') ? 'scale-110 text-brand-gold' : 'opacity-50 hover:opacity-100'}`}>
+               <LayoutDashboard size={22} strokeWidth={(activeView === 'services' || activeView === 'history' || activeView === 'apply') ? 2.5 : 2} />
+               <span className="text-[7px] font-black mt-1.5 uppercase tracking-[0.2em]">{user && ADMIN_EMAILS.includes(user.email || '') && activeView === 'history' ? (lang === 'sw' ? 'PANEL' : 'DASH') : (lang === 'sw' ? 'Mkopo' : 'Services')}</span>
+               {(activeView === 'services' || activeView === 'history' || activeView === 'apply') && <motion.div layoutId="nav-glow" className="absolute -bottom-2 w-1 h-1 bg-brand-gold rounded-full shadow-[0_0_10px_#D4AF37]" />}
             </button>
             
             <button onClick={() => setActiveView(user ? 'profile' : 'auth')} className={`flex flex-col items-center transition-all duration-300 relative z-10 ${activeView === 'profile' || activeView === 'auth' ? 'scale-110 text-brand-gold' : 'opacity-50 hover:opacity-100'}`}>
