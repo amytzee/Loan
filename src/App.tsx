@@ -196,6 +196,9 @@ interface AppConfig {
   helpPhone?: string;
   helpEmail?: string;
   helpWhatsapp?: string;
+  helpPhone2?: string;
+  businessHoursSw?: string;
+  businessHoursEn?: string;
   aiEnabled?: boolean;
   geminiApiKey?: string;
   address?: string;
@@ -343,7 +346,7 @@ const translations: Record<Language, Translation> = {
       loanSummary: 'Muhtasari wa Mkopo',
       activeLoans: 'Mikopo Amilifu',
       nextPayment: 'Malipo Yajayo',
-      history: 'Historia ya Maombi',
+      history: 'Mikopo Yangu',
       status: 'Hali ya Mkopo',
       notifs: 'Taarifa',
       settings: 'Mipangilio',
@@ -433,7 +436,7 @@ const translations: Record<Language, Translation> = {
       loanSummary: 'Loan Summary',
       activeLoans: 'Active Loans',
       nextPayment: 'Next Payment',
-      history: 'Application History',
+      history: 'My Loans',
       status: 'Loan Status',
       notifs: 'Notifications',
       settings: 'Account Settings',
@@ -1473,7 +1476,7 @@ const UserProfile = ({
             >
               <div className="flex items-center justify-between mb-6 md:mb-8">
                 <h3 className="text-lg md:text-xl font-bold text-brand-blue dark:text-white flex items-center gap-3">
-                  <History size={20} className="text-brand-gold" /> {t.history}
+                  <HandCoins size={20} className="text-brand-gold" /> {t.history}
                 </h3>
               </div>
 
@@ -1983,8 +1986,8 @@ const ContactForm = ({ lang, user, appConfig }: { lang: Language, user: any, app
                 </div>
                 <div>
                    <h4 className="font-black text-[10px] uppercase tracking-widest text-slate-400 mb-1.5">{lang === 'sw' ? 'Wasiliana' : 'Call'}</h4>
-                   <p className="text-lg md:text-xl font-bold text-brand-blue">0767 991 718 / 0776 629 590</p>
-                   <p className="text-slate-400 font-medium text-sm">{t.hours}</p>
+                   <p className="text-lg md:text-xl font-bold text-brand-blue">{appConfig.helpPhone} / {appConfig.helpPhone2}</p>
+                   <p className="text-slate-400 font-medium text-sm">{lang === 'sw' ? appConfig.businessHoursSw : appConfig.businessHoursEn}</p>
                 </div>
               </div>
             </div>
@@ -2251,9 +2254,12 @@ export default function App() {
     secondaryColor: '#D4AF37', // Default brand-gold
     fontFamily: 'Inter',
     themeMode: 'system',
-    helpPhone: '+255 700 000 000',
+    helpPhone: '0776629590',
+    helpPhone2: '0767991718',
     helpEmail: 'support@coshve.co.tz',
-    helpWhatsapp: '+255 700 000 000',
+    helpWhatsapp: '0776629590',
+    businessHoursSw: 'Jumatatu - Ijumaa: 09:00 - 17:00, Jumamosi: 09:00 - 13:00',
+    businessHoursEn: 'Monday - Friday: 09:00 - 17:00, Saturday: 09:00 - 13:00',
     aiEnabled: true,
     geminiApiKey: '',
     address: 'P.O. BOX 1234, DAR ES SALAAM',
@@ -3032,8 +3038,8 @@ export default function App() {
               className="max-w-7xl mx-auto px-4 md:px-6"
             >
               <div className="mb-8">
-                <h1 className="text-3xl font-display font-bold text-brand-blue">Available Loans</h1>
-                <p className="text-gray-500">Pick the best plan for your needs</p>
+                <h1 className="text-3xl font-display font-bold text-brand-blue">{lang === 'sw' ? 'CHAGUA HUDUMA' : 'Select Service'}</h1>
+                <p className="text-gray-500">{lang === 'sw' ? 'Chagua mpango bora kwa mahitaji yako' : 'Pick the best plan for your needs'}</p>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
                 {loanProducts.map((item: LoanProduct, i) => {
@@ -3379,8 +3385,8 @@ export default function App() {
             >
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
                 <div>
-                  <h1 className="text-2xl font-display font-bold text-brand-blue">{ADMIN_EMAILS.includes(user?.email || '') ? 'Admin Dashboard' : 'Application History'}</h1>
-                  <p className="text-sm text-gray-500">{ADMIN_EMAILS.includes(user?.email || '') ? 'Monitor all system activities' : 'Real-time update of your requests'}</p>
+                  <h1 className="text-2xl font-display font-bold text-brand-blue">{ADMIN_EMAILS.includes(user?.email || '') ? 'Admin Dashboard' : (lang === 'sw' ? 'Mikopo' : 'My Loans')}</h1>
+                  <p className="text-sm text-gray-500">{ADMIN_EMAILS.includes(user?.email || '') ? 'Monitor all system activities' : (lang === 'sw' ? 'Marekebisho ya papo hapo ya maombi yako' : 'Real-time update of your requests')}</p>
                 </div>
                 {user && ADMIN_EMAILS.includes(user?.email || '') && (
                   <div className="flex flex-col sm:flex-row gap-4">
@@ -4100,15 +4106,25 @@ export default function App() {
 
                             <div className="space-y-8">
                                 <div className="app-card dark:bg-slate-900 border-gray-100 dark:border-slate-800 space-y-6">
-                                  <h3 className="font-bold text-brand-blue dark:text-white flex items-center gap-2"><Phone size={18} /> Support Contacts</h3>
+                                  <h3 className="font-bold text-brand-blue dark:text-white flex items-center gap-2"><Phone size={18} /> Support Contacts & Hours</h3>
                                   <div className="space-y-4">
-                                    <div>
-                                      <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Support Phone Number</label>
-                                      <input 
-                                        className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-4 font-bold text-sm dark:text-white"
-                                        value={appConfig.helpPhone}
-                                        onChange={(e) => setAppConfig({ ...appConfig, helpPhone: e.target.value })}
-                                      />
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      <div>
+                                        <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Support Phone 1</label>
+                                        <input 
+                                          className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-4 font-bold text-sm dark:text-white"
+                                          value={appConfig.helpPhone}
+                                          onChange={(e) => setAppConfig({ ...appConfig, helpPhone: e.target.value })}
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Support Phone 2</label>
+                                        <input 
+                                          className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-4 font-bold text-sm dark:text-white"
+                                          value={appConfig.helpPhone2 || ''}
+                                          onChange={(e) => setAppConfig({ ...appConfig, helpPhone2: e.target.value })}
+                                        />
+                                      </div>
                                     </div>
                                     <div>
                                       <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Support Email</label>
@@ -4125,6 +4141,24 @@ export default function App() {
                                         value={appConfig.helpWhatsapp}
                                         onChange={(e) => setAppConfig({ ...appConfig, helpWhatsapp: e.target.value })}
                                       />
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      <div>
+                                        <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Business Hours (Swahili)</label>
+                                        <input 
+                                          className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-4 font-bold text-sm dark:text-white"
+                                          value={appConfig.businessHoursSw || ''}
+                                          onChange={(e) => setAppConfig({ ...appConfig, businessHoursSw: e.target.value })}
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Business Hours (English)</label>
+                                        <input 
+                                          className="w-full bg-gray-50 dark:bg-slate-800 rounded-xl p-4 font-bold text-sm dark:text-white"
+                                          value={appConfig.businessHoursEn || ''}
+                                          onChange={(e) => setAppConfig({ ...appConfig, businessHoursEn: e.target.value })}
+                                        />
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
@@ -4766,7 +4800,7 @@ export default function App() {
                       <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-200">
                         <History className="mx-auto text-gray-200 mb-4" size={48} />
                         <p className="text-gray-400 font-medium whitespace-pre-wrap">
-                          {lang === 'sw' ? 'Huna maombi yoyote bado.\nAnza maombi yako leo!' : 'No applications found yet.\nStart your application today!'}
+                          {lang === 'sw' ? 'Huna mikopo yoyote bado.\nAnza maombi yako leo!' : 'No loans found yet.\nStart your application today!'}
                         </p>
                         <button onClick={() => setActiveView('home')} className="mt-6 text-brand-blue font-bold underline">
                           {lang === 'sw' ? 'Omba Mkopo' : 'Apply Now'}
@@ -5078,6 +5112,7 @@ export default function App() {
                   <div>
                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{lang === 'sw' ? 'Tupigie' : 'Call Us'}</p>
                     <p className="font-bold text-brand-blue dark:text-white">{appConfig.helpPhone}</p>
+                    {appConfig.helpPhone2 && <p className="font-bold text-brand-blue dark:text-white">{appConfig.helpPhone2}</p>}
                   </div>
                 </div>
 
@@ -5088,6 +5123,18 @@ export default function App() {
                   <div>
                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">WhatsApp</p>
                     <p className="font-bold text-brand-blue dark:text-white">{appConfig.helpWhatsapp}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-white/5 rounded-2xl">
+                  <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center text-white">
+                    <Clock size={20} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{lang === 'sw' ? 'Muda wa Kazi' : 'Office Hours'}</p>
+                    <p className="font-bold text-brand-blue dark:text-white text-[11px]">
+                      {lang === 'sw' ? appConfig.businessHoursSw : appConfig.businessHoursEn}
+                    </p>
                   </div>
                 </div>
 
@@ -5560,10 +5607,10 @@ export default function App() {
                {activeView === 'home' && <motion.div layoutId="nav-glow" className="absolute -bottom-2 w-1 h-1 bg-brand-gold rounded-full shadow-[0_0_10px_#D4AF37]" />}
             </button>
             
-            <button onClick={() => setActiveView('history')} className={`flex flex-col items-center transition-all duration-300 relative z-10 ${activeView === 'history' || activeView === 'apply' ? 'scale-110 text-brand-gold' : 'opacity-50 hover:opacity-100'}`}>
-               <LayoutDashboard size={22} strokeWidth={activeView === 'history' || activeView === 'apply' ? 2.5 : 2} />
-               <span className="text-[7px] font-black mt-1.5 uppercase tracking-[0.2em]">{lang === 'sw' ? 'Mkopo' : 'Dash'}</span>
-               {(activeView === 'history' || activeView === 'apply') && <motion.div layoutId="nav-glow" className="absolute -bottom-2 w-1 h-1 bg-brand-gold rounded-full shadow-[0_0_10px_#D4AF37]" />}
+            <button onClick={() => setActiveView('services')} className={`flex flex-col items-center transition-all duration-300 relative z-10 ${activeView === 'services' || activeView === 'apply' ? 'scale-110 text-brand-gold' : 'opacity-50 hover:opacity-100'}`}>
+               <LayoutDashboard size={22} strokeWidth={activeView === 'services' || activeView === 'apply' ? 2.5 : 2} />
+               <span className="text-[7px] font-black mt-1.5 uppercase tracking-[0.2em]">{lang === 'sw' ? 'Mkopo' : 'Services'}</span>
+               {(activeView === 'services' || activeView === 'apply') && <motion.div layoutId="nav-glow" className="absolute -bottom-2 w-1 h-1 bg-brand-gold rounded-full shadow-[0_0_10px_#D4AF37]" />}
             </button>
             
             <button onClick={() => setActiveView(user ? 'profile' : 'auth')} className={`flex flex-col items-center transition-all duration-300 relative z-10 ${activeView === 'profile' || activeView === 'auth' ? 'scale-110 text-brand-gold' : 'opacity-50 hover:opacity-100'}`}>
